@@ -1,0 +1,822 @@
+@page "/"
+@implements IAsyncDisposable
+@using System.Globalization
+@using System.Linq
+@using System.Text.Json
+@using System.Threading
+@using Soenneker.Blazor.WebWorkers.Abstract
+@using Soenneker.Blazor.WebWorkers.Constants
+@using Soenneker.Blazor.WebWorkers.Demo.Workers
+@using Soenneker.Blazor.WebWorkers.Dtos
+@using Soenneker.Blazor.WebWorkers.Enums
+@using Soenneker.Blazor.WebWorkers.Options
+@using Soenneker.Utils.Json
+@inject IWebWorkersUtil WebWorkers
+
+<PageTitle>Soenneker.Blazor.WebWorkers Demo</PageTitle>
+
+<Div Class="min-h-screen bg-background text-foreground">
+    <Div Class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 md:px-6">
+        <Div Class="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <Div Class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <Div Class="max-w-3xl">
+                    <Span Class="inline-flex rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
+                        Demo
+                    </Span>
+                    <H1 Class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Soenneker Blazor WebWorkers</H1>
+                    <Paragraph Class="mt-3 text-sm leading-7 text-muted-foreground">
+                        A simple demo for running work in the background without locking up the UI.
+                        Try the examples below, watch them progress, and see the results come back live.
+                    </Paragraph>
+                </Div>
+
+                <Div Class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    <Span Class="rounded-full border border-border px-3 py-1.5">JS jobs: @ActiveJobCount</Span>
+                    <Span Class="rounded-full border border-border px-3 py-1.5">.NET jobs: @ActiveDotNetInvocationCount</Span>
+                    <Span Class="rounded-full border border-border px-3 py-1.5">Live demo</Span>
+                </Div>
+            </Div>
+        </Div>
+
+        <Div Class="grid gap-4 md:grid-cols-3">
+            <Div Class="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <Paragraph Class="text-sm font-medium leading-normal">Run background jobs</Paragraph>
+                <Paragraph Class="mt-2 text-sm leading-7 text-muted-foreground">
+                    Kick off sample jobs and keep the page responsive while the work runs in the background.
+                </Paragraph>
+            </Div>
+            <Div Class="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <Paragraph Class="text-sm font-medium leading-normal">Watch progress</Paragraph>
+                <Paragraph Class="mt-2 text-sm leading-7 text-muted-foreground">
+                    Follow each run as it starts, updates, finishes, or gets cancelled.
+                </Paragraph>
+            </Div>
+            <Div Class="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <Paragraph Class="text-sm font-medium leading-normal">Try both demos</Paragraph>
+                <Paragraph Class="mt-2 text-sm leading-7 text-muted-foreground">
+                    The page includes JavaScript jobs and .NET jobs so you can quickly see both in action.
+                </Paragraph>
+            </Div>
+        </Div>
+
+        <Div Class="grid gap-6 xl:grid-cols-2">
+            <Div Class="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <Div Class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <Div>
+                        <Paragraph Class="text-sm font-medium leading-normal">JavaScript worker pool</Paragraph>
+                        <Paragraph Class="text-sm text-muted-foreground">Run sample JavaScript jobs and watch progress update live.</Paragraph>
+                    </Div>
+                    <Span Class="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">@_status</Span>
+                </Div>
+
+                <Div Class="mt-6 grid gap-4 md:grid-cols-2">
+                    <Field>
+                        <FieldLabel For="worker-count">Worker count</FieldLabel>
+                        <FieldBody>
+                            <Input Id="worker-count" Type="number" min="1" max="8" @bind-Value="_workerCountText" />
+                        </FieldBody>
+                    </Field>
+                    <Field>
+                        <FieldLabel For="timeout-ms">Timeout (ms)</FieldLabel>
+                        <FieldBody>
+                            <Input Id="timeout-ms" Type="number" min="0" step="250" @bind-Value="_timeoutMsText" />
+                        </FieldBody>
+                    </Field>
+                    <Field Class="md:col-span-2">
+                        <FieldLabel For="selected-workload">Workload</FieldLabel>
+                        <FieldBody>
+                            <Select Id="selected-workload" TValue="string" @bind-SelectedValue="_selectedWorkload">
+                                <SelectItem TValue="string" ItemValue="@DemoWorkloads.PrimeAnalysis" Text="Prime analysis" />
+                                <SelectItem TValue="string" ItemValue="@DemoWorkloads.JsonAnalysis" Text="JSON analysis" />
+                                <SelectItem TValue="string" ItemValue="@DemoWorkloads.TextFrequency" Text="Text frequency" />
+                            </Select>
+                        </FieldBody>
+                    </Field>
+
+                    @if (_selectedWorkload == DemoWorkloads.PrimeAnalysis)
+                    {
+                        <Field Class="md:col-span-2">
+                            <FieldLabel For="prime-upper-bound">Prime upper bound</FieldLabel>
+                            <FieldBody>
+                                <Input Id="prime-upper-bound" Type="number" min="5000" step="5000" @bind-Value="_primeUpperBoundText" />
+                            </FieldBody>
+                        </Field>
+                    }
+                    else if (_selectedWorkload == DemoWorkloads.JsonAnalysis)
+                    {
+                        <Field>
+                            <FieldLabel For="generated-objects">Generated objects</FieldLabel>
+                            <FieldBody>
+                                <Input Id="generated-objects" Type="number" min="500" step="500" @bind-Value="_jsonObjectCountText" />
+                            </FieldBody>
+                        </Field>
+                        <Field>
+                            <FieldLabel For="category-count">Categories</FieldLabel>
+                            <FieldBody>
+                                <Input Id="category-count" Type="number" min="2" max="20" @bind-Value="_jsonCategoryCountText" />
+                            </FieldBody>
+                        </Field>
+                    }
+                    else
+                    {
+                        <Field>
+                            <FieldLabel For="paragraph-count">Paragraphs</FieldLabel>
+                            <FieldBody>
+                                <Input Id="paragraph-count" Type="number" min="100" step="100" @bind-Value="_paragraphCountText" />
+                            </FieldBody>
+                        </Field>
+                        <Field>
+                            <FieldLabel For="words-per-paragraph">Words per paragraph</FieldLabel>
+                            <FieldBody>
+                                <Input Id="words-per-paragraph" Type="number" min="10" step="10" @bind-Value="_wordsPerParagraphText" />
+                            </FieldBody>
+                        </Field>
+                    }
+                </Div>
+
+                <Div Class="mt-6 flex flex-wrap gap-3">
+                    <Button Variant="ButtonVariant.Default" OnClick="@(_ => RecreateDefaultPool())">Rebuild JS pool</Button>
+                    <Button Variant="ButtonVariant.Outline" OnClick="@(_ => RunSelectedWorkload())">Run JS workload</Button>
+                    <Button Variant="ButtonVariant.Secondary" OnClick="@(_ => ClearHistory())">Clear JS runs</Button>
+                </Div>
+
+                <Div Class="mt-6 grid gap-3 sm:grid-cols-2">
+                    <Div Class="rounded-lg border border-border bg-background p-4">
+                        <Paragraph Class="text-xs text-muted-foreground leading-normal">Workers / busy</Paragraph>
+                        <Div Class="mt-2 text-2xl font-semibold">@($"{_snapshot.TotalWorkers} / {_snapshot.BusyWorkers}")</Div>
+                    </Div>
+                    <Div Class="rounded-lg border border-border bg-background p-4">
+                        <Paragraph Class="text-xs text-muted-foreground leading-normal">Queued / running</Paragraph>
+                        <Div Class="mt-2 text-2xl font-semibold">@($"{_snapshot.QueuedCount} / {_snapshot.RunningCount}")</Div>
+                    </Div>
+                </Div>
+
+                @if (CurrentPool != null)
+                {
+                    <Div Class="mt-6 rounded-lg border border-border bg-background p-4">
+                        <Paragraph Class="text-sm font-medium leading-normal">Current JavaScript pool</Paragraph>
+                        <Div Class="mt-2 space-y-1 text-sm text-muted-foreground">
+                            <Div>Pool: @CurrentPool.Name</Div>
+                            <Div>Worker script: <Span Class="font-mono text-xs text-foreground">@CurrentPool.ScriptPath</Span></Div>
+                            <Div>Script type: @CurrentPool.WorkerType</Div>
+                        </Div>
+                    </Div>
+                }
+            </Div>
+
+            <Div Class="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <Div Class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <Div>
+                        <Paragraph Class="text-sm font-medium leading-normal">.NET worker pool</Paragraph>
+                        <Paragraph Class="text-sm text-muted-foreground">Run the same kind of background work through the .NET worker path.</Paragraph>
+                    </Div>
+                    <Span Class="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">@_dotNetStatus</Span>
+                </Div>
+
+                <Div Class="mt-6 grid gap-4 md:grid-cols-3">
+                    <Field>
+                        <FieldLabel For="dotnet-worker-count">Worker count</FieldLabel>
+                        <FieldBody>
+                            <Input Id="dotnet-worker-count" Type="number" min="1" max="4" @bind-Value="_dotNetWorkerCountText" />
+                        </FieldBody>
+                    </Field>
+                    <Field>
+                        <FieldLabel For="dotnet-timeout-ms">Timeout (ms)</FieldLabel>
+                        <FieldBody>
+                            <Input Id="dotnet-timeout-ms" Type="number" min="0" step="250" @bind-Value="_dotNetTimeoutMsText" />
+                        </FieldBody>
+                    </Field>
+                    <Field>
+                        <FieldLabel For="dotnet-prime-upper-bound">Prime upper bound</FieldLabel>
+                        <FieldBody>
+                            <Input Id="dotnet-prime-upper-bound" Type="number" min="5000" step="5000" @bind-Value="_dotNetPrimeUpperBoundText" />
+                        </FieldBody>
+                    </Field>
+                </Div>
+
+                <Div Class="mt-6 flex flex-wrap gap-3">
+                    <Button Variant="ButtonVariant.Default" OnClick="@(_ => RecreateDotNetPool())">Rebuild .NET pool</Button>
+                    <Button Variant="ButtonVariant.Outline" OnClick="@(_ => RunDotNetInvocationAsync())">Run C# method</Button>
+                    <Button Variant="ButtonVariant.Secondary" OnClick="@(_ => ClearDotNetHistory())">Clear .NET runs</Button>
+                </Div>
+
+                <Div Class="mt-6 grid gap-3 sm:grid-cols-2">
+                    <Div Class="rounded-lg border border-border bg-background p-4">
+                        <Paragraph Class="text-xs text-muted-foreground leading-normal">Workers / busy</Paragraph>
+                        <Div Class="mt-2 text-2xl font-semibold">@($"{_dotNetSnapshot.TotalWorkers} / {_dotNetSnapshot.BusyWorkers}")</Div>
+                    </Div>
+                    <Div Class="rounded-lg border border-border bg-background p-4">
+                        <Paragraph Class="text-xs text-muted-foreground leading-normal">Queued / running</Paragraph>
+                        <Div Class="mt-2 text-2xl font-semibold">@($"{_dotNetSnapshot.QueuedCount} / {_dotNetSnapshot.RunningCount}")</Div>
+                    </Div>
+                </Div>
+
+                <Div Class="mt-6 rounded-lg border border-border bg-background p-4">
+                    <Paragraph Class="text-sm font-medium leading-normal">Exported C# method</Paragraph>
+                    <Div Class="mt-2 break-all font-mono text-xs text-foreground">@_dotNetMethodName</Div>
+                    @if (CurrentDotNetPool != null)
+                    {
+                        <Div Class="mt-4 space-y-1 text-sm text-muted-foreground">
+                            <Div>Pool: @CurrentDotNetPool.Name</Div>
+                            <Div>Bootstrap script: <Span Class="font-mono text-xs text-foreground">@CurrentDotNetPool.ScriptPath</Span></Div>
+                            <Div>.NET runtime script: <Span Class="font-mono text-xs text-foreground">@CurrentDotNetPool.RuntimeScriptPath</Span></Div>
+                        </Div>
+                    }
+                </Div>
+            </Div>
+        </Div>
+
+        <Div Class="grid gap-6 xl:grid-cols-2">
+            <Div Class="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <Div Class="flex items-center justify-between gap-4">
+                    <Div>
+                        <Paragraph Class="text-sm font-medium leading-normal">JavaScript runs</Paragraph>
+                        <Paragraph Class="text-sm text-muted-foreground">Recent JavaScript jobs appear here with progress and results.</Paragraph>
+                    </Div>
+                    <Span Class="text-xs text-muted-foreground">@_jobs.Count item(s)</Span>
+                </Div>
+
+                @if (_jobs.Count == 0)
+                {
+                    <Div Class="mt-6 rounded-lg border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
+                        Run a JavaScript workload to see streamed progress and the result payload here.
+                    </Div>
+                }
+                else
+                {
+                    <Div Class="mt-6 flex flex-col gap-4">
+                        @foreach (DemoJobRecord job in _jobs)
+                        {
+                            <Article Class="rounded-lg border border-border bg-background p-4">
+                                <Div Class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <Div>
+                                        <Div Class="font-medium">@job.Title</Div>
+                                        <Div Class="mt-1 break-all font-mono text-xs text-muted-foreground">@job.JobId</Div>
+                                    </Div>
+                                    <Div Class="flex items-center gap-3">
+                                        <Span Class="@GetJobStateClasses(job.State)">@job.State</Span>
+                                        @if (!job.IsTerminal)
+                                        {
+                                            <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Sm" OnClick="@(_ => CancelJobAsync(job))">Cancel</Button>
+                                        }
+                                    </Div>
+                                </Div>
+
+                                <Div Class="mt-4">
+                                    <Div Class="flex items-center justify-between gap-3 text-sm">
+                                        <Span Class="text-muted-foreground">@job.ProgressMessage</Span>
+                                        <Span Class="font-medium">@($"{Math.Clamp(job.Percent, 0, 100):0}%")</Span>
+                                    </Div>
+                                    <Div Class="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                                        <Div Class="h-full bg-primary transition-all duration-300" Style="@GetProgressStyle(job.Percent)"></Div>
+                                    </Div>
+                                </Div>
+
+                                <Div Class="mt-4 grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+                                    <Div>Duration: @FormatDuration(job.DurationMs)</Div>
+                                    <Div>Workload: @job.Request.WorkloadName</Div>
+                                    <Div>Timeout: @(job.Request.TimeoutMs?.ToString() ?? "None")</Div>
+                                </Div>
+
+                                @if (!string.IsNullOrWhiteSpace(job.ResultPreview))
+                                {
+                                    <PreCode Class="demo-pre mt-4" Highlight="false">@job.ResultPreview</PreCode>
+                                }
+                            </Article>
+                        }
+                    </Div>
+                }
+            </Div>
+
+            <Div Class="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <Div Class="flex items-center justify-between gap-4">
+                    <Div>
+                        <Paragraph Class="text-sm font-medium leading-normal">.NET runs</Paragraph>
+                        <Paragraph Class="text-sm text-muted-foreground">Recent .NET jobs appear here with status and results.</Paragraph>
+                    </Div>
+                    <Span Class="text-xs text-muted-foreground">@_dotNetInvocations.Count item(s)</Span>
+                </Div>
+
+                @if (_dotNetInvocations.Count == 0)
+                {
+                    <Div Class="mt-6 rounded-lg border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
+                        Run the exported C# method to see the result payload here.
+                    </Div>
+                }
+                else
+                {
+                    <Div Class="mt-6 flex flex-col gap-4">
+                        @foreach (DemoDotNetInvocationRecord invocation in _dotNetInvocations)
+                        {
+                            <Article Class="rounded-lg border border-border bg-background p-4">
+                                <Div Class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <Div>
+                                        <Div Class="font-medium">C# invocation</Div>
+                                        <Div Class="mt-1 break-all font-mono text-xs text-muted-foreground">@invocation.InvocationId</Div>
+                                    </Div>
+                                    <Div Class="flex items-center gap-3">
+                                        <Span Class="@GetJobStateClasses(invocation.State)">@invocation.State</Span>
+                                        @if (!invocation.IsTerminal)
+                                        {
+                                            <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Sm" OnClick="@(_ => CancelDotNetRequestAsync(invocation))">Cancel</Button>
+                                        }
+                                    </Div>
+                                </Div>
+
+                                <Paragraph Class="mt-4 text-sm text-muted-foreground">@invocation.StatusMessage</Paragraph>
+
+                                <Div Class="mt-4 grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
+                                    <Div>Method: <Span Class="break-all font-mono text-xs text-foreground">@invocation.MethodName</Span></Div>
+                                    <Div>Duration: @FormatDuration(invocation.DurationMs)</Div>
+                                </Div>
+
+                                @if (!string.IsNullOrWhiteSpace(invocation.ResultPreview))
+                                {
+                                    <PreCode Class="demo-pre mt-4" Highlight="false">@invocation.ResultPreview</PreCode>
+                                }
+                            </Article>
+                        }
+                    </Div>
+                }
+            </Div>
+        </Div>
+
+        <Div Class="grid gap-6 xl:grid-cols-1">
+            <Div Class="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <Paragraph Class="text-sm font-medium leading-normal">Minimal setup</Paragraph>
+                <Paragraph Class="mt-2 text-sm leading-7 text-muted-foreground">
+                    A quick example of what setup looks like if you want to use this package in your own app.
+                </Paragraph>
+                <CodeEditor ReadOnly="true" Language="csharp" Text="@QuickStartSnippet"></CodeEditor>
+            </Div>
+
+            <Div Class="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <Paragraph Class="text-sm font-medium leading-normal">Custom JavaScript worker path</Paragraph>
+                <Paragraph Class="mt-2 text-sm leading-7 text-muted-foreground">
+                    If your worker script lives in a Razor class library, this shows how to point a pool at that asset.
+                </Paragraph>
+                <CodeEditor ReadOnly="true" Language="csharp" Text="@CustomWorkerSnippet"></CodeEditor>
+            </Div>
+        </Div>
+    </Div>
+</Div>
+
+@code {
+    private readonly CancellationTokenSource _componentCancellationSource = new();
+    private readonly List<DemoJobRecord> _jobs = [];
+    private readonly List<DemoDotNetInvocationRecord> _dotNetInvocations = [];
+
+    private Task? _monitorTask;
+    private const string _demoWorkerScriptPath = "js/workers/demo.worker.js";
+    private const string _dotNetMethodName = "Soenneker.Blazor.WebWorkers.Demo.Workers.DemoDotNetWorkerExports.AnalyzePrimeRange";
+
+    private WebWorkerCoordinatorSnapshot _snapshot = new();
+
+    private WebWorkerCoordinatorSnapshot _dotNetSnapshot = new()
+    {
+        Backend = WebWorkerBackend.DotNet
+    };
+
+    private string _selectedWorkload = DemoWorkloads.PrimeAnalysis;
+    private string _status = "Setting up JavaScript worker pool...";
+    private string _dotNetStatus = "Setting up .NET worker pool...";
+
+    private string _workerCountText = "2";
+    private string _timeoutMsText = string.Empty;
+    private string _primeUpperBoundText = "160000";
+    private string _jsonObjectCountText = "14000";
+    private string _jsonCategoryCountText = "10";
+    private string _paragraphCountText = "1800";
+    private string _wordsPerParagraphText = "70";
+    private string _dotNetWorkerCountText = "1";
+    private string _dotNetTimeoutMsText = string.Empty;
+    private string _dotNetPrimeUpperBoundText = "220000";
+
+    private int ActiveJobCount => _jobs.Count(job => !job.IsTerminal);
+    private int ActiveDotNetInvocationCount => _dotNetInvocations.Count(invocation => !invocation.IsTerminal);
+    private WebWorkerPoolSnapshot? CurrentPool => _snapshot.Pools.FirstOrDefault(pool => pool.Name == WebWorkersDefaults.DefaultPoolName);
+    private WebWorkerPoolSnapshot? CurrentDotNetPool => _dotNetSnapshot.Pools.FirstOrDefault(pool => pool.Name == DotNetWebWorkersDefaults.DefaultPoolName);
+    private int WorkerCount => ParseInt(_workerCountText, 2);
+    private int? TimeoutMs => ParseNullableInt(_timeoutMsText);
+    private int PrimeUpperBound => ParseInt(_primeUpperBoundText, 160000);
+    private int JsonObjectCount => ParseInt(_jsonObjectCountText, 14000);
+    private int JsonCategoryCount => ParseInt(_jsonCategoryCountText, 10);
+    private int ParagraphCount => ParseInt(_paragraphCountText, 1800);
+    private int WordsPerParagraph => ParseInt(_wordsPerParagraphText, 70);
+    private int DotNetWorkerCount => ParseInt(_dotNetWorkerCountText, 1);
+    private int? DotNetTimeoutMs => ParseNullableInt(_dotNetTimeoutMsText);
+    private int DotNetPrimeUpperBound => ParseInt(_dotNetPrimeUpperBoundText, 220000);
+
+    private string QuickStartSnippet =>
+        @"builder.Services.AddWebWorkersUtilAsScoped();
+
+await WebWorkers.Initialize();
+
+// JavaScript worker pool
+await WebWorkers.CreatePool(new WebWorkerPoolOptions
+{
+    WorkerCount = 4,
+    ScriptPath = ""js/workers/demo.worker.js""
+});
+
+// .NET worker pool for [JSExport] methods
+await WebWorkers.CreatePool(new WebWorkerPoolOptions
+{
+    Backend = WebWorkerBackend.DotNet,
+    WorkerCount = 1
+});
+
+// Queue a named JavaScript workload with a payload object
+WebWorkerResult<JsonElement> jsResult = await WebWorkers.Run<JsonElement>(
+    DemoWorkloads.PrimeAnalysis,
+    new { upperBound = 180000 });
+
+// Invoke an exported C# method through the same utility
+WebWorkerResult<DotNetPrimeAnalysisResult> dotNetResult =
+    await WebWorkers.Run(() => DemoDotNetWorkerExports.AnalyzePrimeRangeAsync(220000));";
+
+    private string CustomWorkerSnippet =>
+        @"string workerPath = WebWorkerAssetPaths.WorkerFromPackage(
+    ""Soenneker.Blazor.LongJob"",
+    ""longjob.worker.js"");
+
+await WebWorkers.CreatePool(new WebWorkerPoolOptions
+{
+    Name = ""longjob"",
+    WorkerCount = 2,
+    WorkerType = WebWorkerScriptType.Module,
+    ScriptPath = workerPath
+});";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await WebWorkers.Initialize(_componentCancellationSource.Token);
+        await RecreateDefaultPool();
+        await RecreateDotNetPool();
+        _monitorTask = MonitorSnapshot(_componentCancellationSource.Token);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _componentCancellationSource.CancelAsync();
+
+        try
+        {
+            if (_monitorTask != null)
+                await _monitorTask;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        try
+        {
+            await WebWorkers.DestroyPool(WebWorkersDefaults.DefaultPoolName);
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            await WebWorkers.DestroyPool(DotNetWebWorkersDefaults.DefaultPoolName, WebWorkerBackend.DotNet);
+        }
+        catch
+        {
+        }
+
+        _componentCancellationSource.Dispose();
+    }
+
+    private async Task MonitorSnapshot(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(300));
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await RefreshSnapshotsAsync();
+
+                if (ActiveJobCount > 0 || ActiveDotNetInvocationCount > 0)
+                    await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task RecreateDefaultPool()
+    {
+        await WebWorkers.CreatePool(new WebWorkerPoolOptions
+        {
+            WorkerCount = Math.Clamp(WorkerCount, 1, 8),
+            ScriptPath = _demoWorkerScriptPath
+        }, _componentCancellationSource.Token);
+
+        await RefreshSnapshotsAsync();
+        _status = $"Ready. JavaScript pool configured with {CurrentPool?.WorkerCount ?? 0} worker(s).";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RecreateDotNetPool()
+    {
+        await WebWorkers.CreatePool(new WebWorkerPoolOptions
+        {
+            Backend = WebWorkerBackend.DotNet,
+            WorkerCount = Math.Clamp(DotNetWorkerCount, 1, 4)
+        }, _componentCancellationSource.Token);
+
+        await RefreshSnapshotsAsync();
+        _dotNetStatus = $"Ready. .NET pool configured with {CurrentDotNetPool?.WorkerCount ?? 0} worker(s).";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RunSelectedWorkload()
+    {
+        DemoJobRecord record = CreateRecord();
+        _jobs.Insert(0, record);
+        TrimJobs();
+
+        _status = $"Queued {record.Title.ToLowerInvariant()} on the JavaScript worker pool.";
+        await RefreshSnapshotsAsync();
+        await InvokeAsync(StateHasChanged);
+
+        _ = ExecuteJobAsync(record);
+    }
+
+    private async Task CancelJobAsync(DemoJobRecord job)
+    {
+        await WebWorkers.CancelRequest(WebWorkersDefaults.DefaultPoolName, job.JobId, cancellationToken: _componentCancellationSource.Token);
+        _status = $"Cancellation requested for JavaScript run {job.JobId}.";
+        await RefreshSnapshotsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RunDotNetInvocationAsync()
+    {
+        DemoDotNetInvocationRecord record = CreateDotNetInvocationRecord();
+        _dotNetInvocations.Insert(0, record);
+        TrimDotNetInvocations();
+
+        _dotNetStatus = "Queued exported C# method on the .NET worker pool.";
+        await RefreshSnapshotsAsync();
+        await InvokeAsync(StateHasChanged);
+
+        _ = ExecuteDotNetInvocationAsync(record);
+    }
+
+    private async Task CancelDotNetRequestAsync(DemoDotNetInvocationRecord invocation)
+    {
+        await WebWorkers.CancelRequest(DotNetWebWorkersDefaults.DefaultPoolName, invocation.InvocationId, WebWorkerBackend.DotNet, _componentCancellationSource.Token);
+        _dotNetStatus = $"Cancellation requested for .NET run {invocation.InvocationId}.";
+        await RefreshSnapshotsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ExecuteJobAsync(DemoJobRecord record)
+    {
+        try
+        {
+            WebWorkerResult<JsonElement> result = await WebWorkers.Run<JsonElement>(record.Request, progress => UpdateRecordProgressAsync(record, progress), _componentCancellationSource.Token);
+
+            record.State = result.State;
+            record.DurationMs = result.DurationMs;
+            record.Percent = result.State == WebWorkerJobState.Completed ? 100 : record.Percent;
+            record.ProgressMessage = result.State switch
+            {
+                WebWorkerJobState.Completed => $"Completed on {result.WorkerId} in {FormatDuration(result.DurationMs)}.",
+                WebWorkerJobState.Cancelled => result.ErrorMessage ?? "Cancelled.",
+                WebWorkerJobState.Faulted => result.ErrorMessage ?? "Faulted.",
+                _ => record.ProgressMessage
+            };
+            record.ResultPreview = result.State == WebWorkerJobState.Completed ? PrettyPrint(result.Result) : record.ProgressMessage;
+
+            _status = result.State switch
+            {
+                WebWorkerJobState.Completed => $"{record.Title} completed on the JavaScript pool.",
+                WebWorkerJobState.Cancelled => $"{record.Title} was cancelled on the JavaScript pool.",
+                WebWorkerJobState.Faulted => $"{record.Title} failed on the JavaScript pool.",
+                _ => _status
+            };
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            record.State = WebWorkerJobState.Faulted;
+            record.ProgressMessage = ex.Message;
+            record.ResultPreview = ex.ToString();
+            _status = $"{record.Title} failed before completion.";
+        }
+        finally
+        {
+            await RefreshSnapshotsAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ExecuteDotNetInvocationAsync(DemoDotNetInvocationRecord record)
+    {
+        try
+        {
+            WebWorkerResult<string?> result = await WebWorkers.Run(() => DemoDotNetWorkerExports.AnalyzePrimeRange(Math.Max(DotNetPrimeUpperBound, 5000)), requestId: record.InvocationId, timeoutMs: DotNetTimeoutMs is > 0 ? DotNetTimeoutMs : null, cancellationToken: _componentCancellationSource.Token);
+
+            record.State = result.State;
+            record.DurationMs = result.DurationMs;
+            record.StatusMessage = result.State switch
+            {
+                WebWorkerJobState.Completed => $"Completed on {result.WorkerId} in {FormatDuration(result.DurationMs)}.",
+                WebWorkerJobState.Cancelled => result.ErrorMessage ?? "Cancelled.",
+                WebWorkerJobState.Faulted => result.ErrorMessage ?? "Faulted.",
+                _ => record.StatusMessage
+            };
+            DotNetPrimeAnalysisResult? resultModel = result.State == WebWorkerJobState.Completed ? DeserializeDotNetResult(result.Result) : null;
+            record.ResultPreview = result.State == WebWorkerJobState.Completed ? PrettyPrintObject(resultModel) : record.StatusMessage;
+
+            _dotNetStatus = result.State switch
+            {
+                WebWorkerJobState.Completed => "Exported C# method completed on the .NET worker pool.",
+                WebWorkerJobState.Cancelled => "Exported C# method was cancelled on the .NET worker pool.",
+                WebWorkerJobState.Faulted => "Exported C# method failed on the .NET worker pool.",
+                _ => _dotNetStatus
+            };
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            record.State = WebWorkerJobState.Faulted;
+            record.StatusMessage = ex.Message;
+            record.ResultPreview = ex.ToString();
+            _dotNetStatus = ".NET worker invocation failed before completion.";
+        }
+        finally
+        {
+            await RefreshSnapshotsAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async ValueTask UpdateRecordProgressAsync(DemoJobRecord record, WebWorkerJobProgress progress)
+    {
+        record.State = WebWorkerJobState.Running;
+        record.Percent = progress.Percent;
+        record.ProgressMessage = progress.Message ?? progress.Stage ?? "Running";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private DemoJobRecord CreateRecord()
+    {
+        var jobId = Guid.NewGuid()
+                        .ToString("N");
+
+        return new DemoJobRecord
+        {
+            JobId = jobId,
+            Title = SelectedWorkloadTitle,
+            ProgressMessage = "Waiting for an available JavaScript worker.",
+            Percent = 0,
+            State = WebWorkerJobState.Running,
+            Request = BuildRequest(jobId)
+        };
+    }
+
+    private static DemoDotNetInvocationRecord CreateDotNetInvocationRecord()
+    {
+        return new DemoDotNetInvocationRecord
+        {
+            InvocationId = Guid.NewGuid()
+                               .ToString("N"),
+            MethodName = _dotNetMethodName,
+            State = WebWorkerJobState.Running,
+            StatusMessage = "Waiting for an available .NET worker to invoke the exported method."
+        };
+    }
+
+    private WebWorkerRequest BuildRequest(string jobId)
+    {
+        return new WebWorkerRequest
+        {
+            RequestId = jobId,
+            WorkloadName = _selectedWorkload,
+            TimeoutMs = TimeoutMs is > 0 ? TimeoutMs : null,
+            Payload = _selectedWorkload switch
+            {
+                DemoWorkloads.PrimeAnalysis => new
+                {
+                    upperBound = Math.Max(PrimeUpperBound, 5000)
+                },
+                DemoWorkloads.JsonAnalysis => new
+                {
+                    objectCount = Math.Max(JsonObjectCount, 500),
+                    categoryCount = Math.Clamp(JsonCategoryCount, 2, 20)
+                },
+                _ => new
+                {
+                    paragraphCount = Math.Max(ParagraphCount, 100),
+                    wordsPerParagraph = Math.Max(WordsPerParagraph, 10)
+                }
+            }
+        };
+    }
+
+    private string SelectedWorkloadTitle => _selectedWorkload switch
+    {
+        DemoWorkloads.PrimeAnalysis => "Prime analysis",
+        DemoWorkloads.JsonAnalysis => "JSON analysis",
+        _ => "Text frequency"
+    };
+
+    private async Task RefreshSnapshotsAsync()
+    {
+        _snapshot = await WebWorkers.GetCoordinatorSnapshot(cancellationToken: _componentCancellationSource.Token);
+        _dotNetSnapshot = await WebWorkers.GetCoordinatorSnapshot(WebWorkerBackend.DotNet, _componentCancellationSource.Token);
+    }
+
+    private static string FormatDuration(double? durationMs)
+    {
+        return durationMs is > 0 ? $"{durationMs:0} ms" : "Pending";
+    }
+
+    private static int ParseInt(string? value, int fallback)
+    {
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : fallback;
+    }
+
+    private static int? ParseNullableInt(string? value)
+    {
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : null;
+    }
+
+    private static string GetJobStateClasses(WebWorkerJobState state)
+    {
+        return state switch
+        {
+            WebWorkerJobState.Completed => "rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-emerald-300",
+            WebWorkerJobState.Cancelled => "rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-amber-200",
+            WebWorkerJobState.Faulted => "rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-rose-300",
+            _ => "rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-sky-300"
+        };
+    }
+
+    private static string GetProgressStyle(double percent)
+    {
+        return $"width: {Math.Clamp(percent, 0, 100).ToString("0.##", CultureInfo.InvariantCulture)}%;";
+    }
+
+    private static string PrettyPrint(JsonElement? value)
+    {
+        if (value == null)
+            return "No result payload.";
+
+        string compact = JsonUtil.Serialize(value.Value) ?? string.Empty;
+        return JsonUtil.Format(compact, forceWindowsLineEndings: false);
+    }
+
+    private static string PrettyPrintObject<T>(T? value)
+    {
+        if (value == null)
+            return "No result payload.";
+
+        string compact = JsonUtil.Serialize(value) ?? string.Empty;
+        return JsonUtil.Format(compact, forceWindowsLineEndings: false);
+    }
+
+    private static DotNetPrimeAnalysisResult? DeserializeDotNetResult(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : JsonUtil.Deserialize<DotNetPrimeAnalysisResult>(value);
+    }
+
+    private void ClearHistory()
+    {
+        _jobs.Clear();
+        _status = "Cleared JavaScript run history.";
+    }
+
+    private void ClearDotNetHistory()
+    {
+        _dotNetInvocations.Clear();
+        _dotNetStatus = "Cleared .NET run history.";
+    }
+
+    private void TrimJobs()
+    {
+        const int maxJobs = 8;
+
+        if (_jobs.Count > maxJobs)
+            _jobs.RemoveRange(maxJobs, _jobs.Count - maxJobs);
+    }
+
+    private void TrimDotNetInvocations()
+    {
+        const int maxInvocations = 4;
+
+        if (_dotNetInvocations.Count > maxInvocations)
+            _dotNetInvocations.RemoveRange(maxInvocations, _dotNetInvocations.Count - maxInvocations);
+    }
+
+}

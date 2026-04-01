@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/.github/">
+    <File Path=".github/renovate.json" />
+  </Folder>
+  <Folder Name="/.github/workflows/">
+    <File Path=".github/workflows/build-and-test.yml" />
+    <File Path=".github/workflows/codeql.yml" />
+    <File Path=".github/workflows/publish-package.yml" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Soenneker.Blazor.WebWorkers/Soenneker.Blazor.WebWorkers.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Soenneker.Blazor.WebWorkers.Tests/Soenneker.Blazor.WebWorkers.Tests.csproj" />
+    <Project Path="test/Soenneker.Blazor.WebWorkers.Demo/Soenneker.Blazor.WebWorkers.Demo.csproj" />
+  </Folder>
+</Solution>
