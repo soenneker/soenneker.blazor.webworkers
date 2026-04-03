@@ -32,8 +32,8 @@ public sealed class Program
                 BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
             });
 
-            builder.Services.AddQuarkSuiteAsScoped();
             builder.Services.AddWebWorkersUtilAsScoped();
+            builder.Services.AddQuarkSuiteAsScoped();
 
             WebAssemblyHost host = builder.Build();
 
@@ -76,3 +76,5 @@ public sealed class Program
         Log.Logger = loggerConfig.CreateLogger();
     }
 }
+
+

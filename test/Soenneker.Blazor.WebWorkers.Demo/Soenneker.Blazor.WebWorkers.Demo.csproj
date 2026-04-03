@@ -27,3 +27,4 @@
         <ProjectReference Include="..\..\src\Soenneker.Blazor.WebWorkers\Soenneker.Blazor.WebWorkers.csproj" />
     </ItemGroup>
 </Project>
+

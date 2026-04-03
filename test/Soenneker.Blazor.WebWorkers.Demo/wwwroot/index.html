@@ -7,6 +7,19 @@
     <title>Soenneker.Blazor.WebWorkers Demo</title>
     <link href="css/quark-tailwind.min.css" rel="stylesheet" />
     <base href="%BASE_URL%" />
+    <script>
+        (() => {
+            const storageKey = "quark-theme";
+            const storedTheme = localStorage.getItem(storageKey);
+            const resolvedTheme = storedTheme === "dark" ? "dark" : "light";
+
+            if (!storedTheme) {
+                localStorage.setItem(storageKey, "light");
+            }
+
+            document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
+        })();
+    </script>
     <link href="css/app.css" rel="stylesheet" />
 </head>
 
