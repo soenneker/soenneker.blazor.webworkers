@@ -10,6 +10,7 @@ using Serilog;
 using Serilog.Debugging;
 using Soenneker.Quark;
 using Soenneker.Blazor.WebWorkers.Registrars;
+using Soenneker.Quark.Gen.Lucide.Generated;
 using Soenneker.Serilog.Sinks.Browser.Blazor.Registrars;
 
 namespace Soenneker.Blazor.WebWorkers.Demo;
@@ -34,6 +35,7 @@ public sealed class Program
 
             builder.Services.AddWebWorkersUtilAsScoped();
             builder.Services.AddQuarkSuiteAsScoped();
+            builder.Services.AddLucideIconsAsScoped();
 
             WebAssemblyHost host = builder.Build();
 
