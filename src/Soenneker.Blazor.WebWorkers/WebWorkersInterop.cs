@@ -4,8 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
-using Soenneker.Asyncs.Initializers;
-using Soenneker.Blazor.Utils.ResourceLoader.Abstract;
+using Soenneker.Blazor.Utils.ModuleImport.Abstract;
 using Soenneker.Blazor.WebWorkers.Abstract;
 using Soenneker.Blazor.WebWorkers.Constants;
 using Soenneker.Blazor.WebWorkers.Dtos;
@@ -22,21 +21,8 @@ namespace Soenneker.Blazor.WebWorkers;
 public sealed class WebWorkersInterop : IWebWorkersInterop
 {
     private const string _modulePath = WebWorkerAssetPaths.InteropScript;
-    private const string _jsInitialize = "WebWorkersInterop.initialize";
-    private const string _jsCreatePool = "WebWorkersInterop.createPool";
-    private const string _jsPoolExists = "WebWorkersInterop.poolExists";
-    private const string _jsRunRequest = "WebWorkersInterop.runRequest";
-    private const string _jsCancelRequest = "WebWorkersInterop.cancelRequest";
-    private const string _jsDestroyPool = "WebWorkersInterop.destroyPool";
-    private const string _jsGetPoolSnapshot = "WebWorkersInterop.getPoolSnapshot";
-    private const string _jsGetPoolSnapshots = "WebWorkersInterop.getPoolSnapshots";
-    private const string _jsGetCoordinatorSnapshot = "WebWorkersInterop.getCoordinatorSnapshot";
-    private const string _jsDispose = "WebWorkersInterop.dispose";
 
-    private readonly IJSRuntime _jsRuntime;
-    private readonly IResourceLoader _resourceLoader;
-    private readonly AsyncInitializer _moduleInitializer;
-    private readonly AsyncInitializer _jsInitializer;
+    private readonly IModuleImportUtil _moduleImportUtil;
     private readonly CancellationScope _cancellationScope = new();
     private readonly ConcurrentDictionary<string, IPendingJob> _pendingJobs = new();
     private readonly ConcurrentDictionary<string, IDotNetPendingInvocation> _pendingInvocations = new();
@@ -45,30 +31,15 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
     private bool _disposed;
     private bool _initialized;
 
-    public WebWorkersInterop(IJSRuntime jsRuntime, IResourceLoader resourceLoader)
+    public WebWorkersInterop(IModuleImportUtil moduleImportUtil)
     {
-        _jsRuntime = jsRuntime;
-        _resourceLoader = resourceLoader;
-        _moduleInitializer = new AsyncInitializer(InitializeModule);
-        _jsInitializer = new AsyncInitializer(InitializeJs);
-    }
-
-    private async ValueTask InitializeModule(CancellationToken cancellationToken)
-    {
-        _ = await _resourceLoader.ImportModule(_modulePath, cancellationToken);
+        _moduleImportUtil = moduleImportUtil;
     }
 
     private DotNetObjectReference<WebWorkersInterop> GetOrCreateDotNetReference()
     {
         _dotNetReference ??= DotNetObjectReference.Create(this);
         return _dotNetReference;
-    }
-
-    private async ValueTask InitializeJs(CancellationToken cancellationToken)
-    {
-        await _moduleInitializer.Init(cancellationToken);
-        await _jsRuntime.InvokeVoidAsync(_jsInitialize, cancellationToken, GetOrCreateDotNetReference());
-        _initialized = true;
     }
 
     private async ValueTask EnsureInitialized(CancellationToken cancellationToken)
@@ -78,7 +49,15 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         CancellationToken linked = _cancellationScope.CancellationToken.Link(cancellationToken, out CancellationTokenSource? source);
 
         using (source)
-            await _jsInitializer.Init(linked);
+        {
+            IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
+
+            if (!_initialized)
+            {
+                await module.InvokeVoidAsync("initialize", linked, GetOrCreateDotNetReference());
+                _initialized = true;
+            }
+        }
     }
 
     public ValueTask Initialize(CancellationToken cancellationToken = default)
@@ -103,7 +82,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         using (source)
         {
             await EnsureInitialized(linked);
-            await _jsRuntime.InvokeVoidAsync(_jsCreatePool, linked, JsonUtil.Serialize(options));
+            IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
+            await module.InvokeVoidAsync("createPool", linked, JsonUtil.Serialize(options));
         }
     }
 
@@ -118,7 +98,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         using (source)
         {
             await EnsureInitialized(linked);
-            return await _jsRuntime.InvokeAsync<bool>(_jsPoolExists, linked, poolName, backend.ToString());
+            IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
+            return await module.InvokeAsync<bool>("poolExists", linked, poolName, backend.ToString());
         }
     }
 
@@ -143,8 +124,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         }, progressCallback, cancellationToken);
     }
 
-    public async ValueTask<WebWorkerResult<TResult>> Run<TResult>(WebWorkerRequest request,
-        Func<WebWorkerJobProgress, ValueTask>? progressCallback = null, CancellationToken cancellationToken = default)
+    public async ValueTask<WebWorkerResult<TResult>> Run<TResult>(WebWorkerRequest request, Func<WebWorkerJobProgress, ValueTask>? progressCallback = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -158,7 +139,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
 
             bool useDefaultPool = string.IsNullOrWhiteSpace(request.PoolName);
             request.PoolName = NormalizeDotNetPoolName(request.PoolName);
-            request.RequestId ??= Guid.NewGuid().ToString("N");
+            request.RequestId ??= Guid.NewGuid()
+                                      .ToString("N");
             request.Arguments ??= [];
 
             if (useDefaultPool)
@@ -183,7 +165,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
                 using (dotNetSource)
                 {
                     await EnsureInitialized(linkedDotNet);
-                    await _jsRuntime.InvokeVoidAsync(_jsRunRequest, linkedDotNet, JsonUtil.Serialize(request));
+                    IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linkedDotNet);
+                    await module.InvokeVoidAsync("runRequest", linkedDotNet, JsonUtil.Serialize(request));
                 }
 
                 return await pendingInvocation.Task.WaitAsync(_cancellationScope.CancellationToken);
@@ -200,7 +183,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
 
         bool useDefaultJsPool = string.IsNullOrWhiteSpace(request.PoolName);
         request.PoolName = NormalizePoolName(request.PoolName);
-        request.RequestId ??= Guid.NewGuid().ToString("N");
+        request.RequestId ??= Guid.NewGuid()
+                                  .ToString("N");
 
         if (useDefaultJsPool)
             await EnsurePoolExistsForRun(request.PoolName, cancellationToken);
@@ -224,7 +208,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
             using (source)
             {
                 await EnsureInitialized(linked);
-                await _jsRuntime.InvokeVoidAsync(_jsRunRequest, linked, JsonUtil.Serialize(request));
+                IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
+                await module.InvokeVoidAsync("runRequest", linked, JsonUtil.Serialize(request));
             }
 
             return await pendingJob.Task.WaitAsync(_cancellationScope.CancellationToken);
@@ -250,12 +235,12 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         using (source)
         {
             await EnsureInitialized(linked);
-            await _jsRuntime.InvokeVoidAsync(_jsCancelRequest, linked, poolName, requestId, backend.ToString());
+            IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
+            await module.InvokeVoidAsync("cancelRequest", linked, poolName, requestId, backend.ToString());
         }
     }
 
-    public async ValueTask DestroyPool(string poolName, WebWorkerBackend backend = WebWorkerBackend.JavaScript,
-        CancellationToken cancellationToken = default)
+    public async ValueTask DestroyPool(string poolName, WebWorkerBackend backend = WebWorkerBackend.JavaScript, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(poolName))
             throw new ArgumentException("Pool name cannot be null or whitespace.", nameof(poolName));
@@ -265,7 +250,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         using (source)
         {
             await EnsureInitialized(linked);
-            await _jsRuntime.InvokeVoidAsync(_jsDestroyPool, linked, poolName, backend.ToString());
+            IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
+            await module.InvokeVoidAsync("destroyPool", linked, poolName, backend.ToString());
         }
     }
 
@@ -280,7 +266,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         using (source)
         {
             await EnsureInitialized(linked);
-            string? json = await _jsRuntime.InvokeAsync<string?>(_jsGetPoolSnapshot, linked, poolName, backend.ToString());
+            IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
+            string? json = await module.InvokeAsync<string?>("getPoolSnapshot", linked, poolName, backend.ToString());
 
             return string.IsNullOrWhiteSpace(json) || string.Equals(json, "null", StringComparison.OrdinalIgnoreCase)
                 ? null
@@ -296,7 +283,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         using (source)
         {
             await EnsureInitialized(linked);
-            string json = await _jsRuntime.InvokeAsync<string>(_jsGetPoolSnapshots, linked, backend.ToString());
+            IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
+            string json = await module.InvokeAsync<string>("getPoolSnapshots", linked, backend.ToString());
 
             return JsonUtil.Deserialize<List<WebWorkerPoolSnapshot>>(json) ?? [];
         }
@@ -310,7 +298,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         using (source)
         {
             await EnsureInitialized(linked);
-            string json = await _jsRuntime.InvokeAsync<string>(_jsGetCoordinatorSnapshot, linked, backend.ToString());
+            IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
+            string json = await module.InvokeAsync<string>("getCoordinatorSnapshot", linked, backend.ToString());
 
             return JsonUtil.Deserialize<WebWorkerCoordinatorSnapshot>(json) ?? new WebWorkerCoordinatorSnapshot();
         }
@@ -403,14 +392,22 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         _pendingInvocations.Clear();
 
         if (_initialized)
-            await _jsRuntime.InvokeVoidAsync(_jsDispose);
+        {
+            try
+            {
+                IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, CancellationToken.None);
+                await module.InvokeVoidAsync("dispose", CancellationToken.None);
+            }
+            catch
+            {
+                // Best-effort cleanup when the JS runtime may already be torn down.
+            }
+        }
 
         _dotNetReference?.Dispose();
         _dotNetReference = null;
 
-        await _resourceLoader.DisposeModule(_modulePath);
-        await _jsInitializer.DisposeAsync();
-        await _moduleInitializer.DisposeAsync();
+        await _moduleImportUtil.DisposeContentModule(_modulePath);
         await _cancellationScope.DisposeAsync();
     }
 
@@ -456,8 +453,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         if (await PoolExists(poolName, cancellationToken: linkedCancellationToken))
             return;
 
-        throw new InvalidOperationException(
-            $"Worker pool '{poolName}' does not exist. Create the pool first and supply a worker ScriptPath.");
+        throw new InvalidOperationException($"Worker pool '{poolName}' does not exist. Create the pool first and supply a worker ScriptPath.");
     }
 
     private async ValueTask EnsureDotNetPoolExistsForRun(string poolName, CancellationToken linkedCancellationToken)

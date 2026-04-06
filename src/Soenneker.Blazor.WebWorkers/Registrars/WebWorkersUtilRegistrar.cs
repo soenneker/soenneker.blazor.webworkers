@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Soenneker.Blazor.WebWorkers.Abstract;
-using Soenneker.Blazor.Utils.ResourceLoader.Registrars;
+using Soenneker.Blazor.Utils.ModuleImport.Registrars;
 
 namespace Soenneker.Blazor.WebWorkers.Registrars;
 
@@ -15,7 +15,7 @@ public static class WebWorkersUtilRegistrar
     /// </summary>
     public static IServiceCollection AddWebWorkersUtilAsScoped(this IServiceCollection services)
     {
-        services.AddResourceLoaderAsScoped();
+        services.AddModuleImportUtilAsScoped();
         services.TryAddScoped<IWebWorkersInterop, WebWorkersInterop>();
         services.TryAddScoped<IWebWorkersUtil, WebWorkersUtil>();
 

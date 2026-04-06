@@ -27,16 +27,14 @@ function normalizePoolName(poolName) {
     return typeof poolName === "string" && poolName.trim().length > 0 ? poolName : DEFAULT_POOL_NAME;
 }
 
-export class WebWorkersInterop {
-    constructor() {
-        this.dotNetReference = null;
-        this.pools = new Map();
-        this.dotNetPools = new Map();
-    }
+const webWorkersInterop = {
+    dotNetReference: null,
+    pools: new Map(),
+    dotNetPools: new Map(),
 
     initialize(dotNetReference) {
         this.dotNetReference = dotNetReference;
-    }
+    },
 
     createPool(optionsJson) {
         const options = parseJson(optionsJson);
@@ -79,7 +77,7 @@ export class WebWorkersInterop {
         }
 
         this.drainJsPool(pool);
-    }
+    },
 
     poolExists(poolName, backend = "JavaScript") {
         if (backend === "DotNet" || backend === 1) {
@@ -87,7 +85,7 @@ export class WebWorkersInterop {
         }
 
         return this.pools.has(poolName);
-    }
+    },
 
     runJob(requestJson) {
         const request = parseJson(requestJson);
@@ -113,7 +111,7 @@ export class WebWorkersInterop {
 
         pool.queue.push(job);
         this.drainJsPool(pool);
-    }
+    },
 
     runRequest(requestJson) {
         const request = parseJson(requestJson);
@@ -123,7 +121,7 @@ export class WebWorkersInterop {
         }
 
         return this.runJob(request);
-    }
+    },
 
     cancelJob(poolName, jobId) {
         const pool = this.getRequiredJsPool(poolName);
@@ -154,7 +152,7 @@ export class WebWorkersInterop {
                 jobId
             });
         }
-    }
+    },
 
     cancelRequest(poolName, requestId, backend = "JavaScript") {
         if (backend === "DotNet" || backend === 1) {
@@ -162,7 +160,7 @@ export class WebWorkersInterop {
         }
 
         return this.cancelJob(poolName, requestId);
-    }
+    },
 
     destroyPool(poolName, backend = "JavaScript") {
         if (backend === "DotNet" || backend === 1) {
@@ -220,7 +218,7 @@ export class WebWorkersInterop {
         }
 
         this.pools.delete(poolName);
-    }
+    },
 
     getPoolSnapshot(poolName, backend = "JavaScript") {
         if (backend === "DotNet" || backend === 1) {
@@ -229,7 +227,7 @@ export class WebWorkersInterop {
 
         const pool = this.pools.get(poolName);
         return pool ? JSON.stringify(this.buildJsPoolSnapshot(pool)) : null;
-    }
+    },
 
     getPoolSnapshots(backend = "JavaScript") {
         if (backend === "DotNet" || backend === 1) {
@@ -237,7 +235,7 @@ export class WebWorkersInterop {
         }
 
         return JSON.stringify(Array.from(this.pools.values()).map(pool => this.buildJsPoolSnapshot(pool)));
-    }
+    },
 
     getCoordinatorSnapshot(backend = "JavaScript") {
         if (backend === "DotNet" || backend === 1) {
@@ -304,11 +302,11 @@ export class WebWorkersInterop {
             this.destroyDotNetPool(pool.name);
             throw error;
         }
-    }
+    },
 
     dotNetPoolExists(poolName) {
         return this.dotNetPools.has(poolName);
-    }
+    },
 
     runDotNetJob(requestJson) {
         const request = parseJson(requestJson);
@@ -334,7 +332,7 @@ export class WebWorkersInterop {
 
         pool.queue.push(invocation);
         this.drainDotNetPool(pool);
-    }
+    },
 
     cancelDotNetJob(poolName, invocationId) {
         const pool = this.getRequiredDotNetPool(poolName);
@@ -393,7 +391,7 @@ export class WebWorkersInterop {
 
         this.replaceDotNetWorkerSlot(pool, slot, true);
         this.drainDotNetPool(pool);
-    }
+    },
 
     destroyDotNetPool(poolName) {
         const pool = this.dotNetPools.get(poolName);
@@ -447,16 +445,16 @@ export class WebWorkersInterop {
         }
 
         this.dotNetPools.delete(poolName);
-    }
+    },
 
     getDotNetPoolSnapshot(poolName) {
         const pool = this.dotNetPools.get(poolName);
         return pool ? JSON.stringify(this.buildDotNetPoolSnapshot(pool)) : null;
-    }
+    },
 
     getDotNetPoolSnapshots() {
         return JSON.stringify(Array.from(this.dotNetPools.values()).map(pool => this.buildDotNetPoolSnapshot(pool)));
-    }
+    },
 
     getDotNetCoordinatorSnapshot() {
         const pools = Array.from(this.dotNetPools.values()).map(pool => this.buildDotNetPoolSnapshot(pool));
@@ -473,7 +471,7 @@ export class WebWorkersInterop {
             faultedCount: pools.reduce((total, pool) => total + pool.faultedCount, 0),
             pools
         });
-    }
+    },
 
     dispose() {
         for (const poolName of Array.from(this.pools.keys())) {
@@ -485,7 +483,7 @@ export class WebWorkersInterop {
         }
 
         this.dotNetReference = null;
-    }
+    },
 
     getRequiredJsPool(poolName) {
         const normalizedPoolName = normalizePoolName(poolName);
@@ -496,7 +494,7 @@ export class WebWorkersInterop {
         }
 
         return pool;
-    }
+    },
 
     getRequiredDotNetPool(poolName) {
         const normalizedPoolName = normalizePoolName(poolName);
@@ -507,7 +505,7 @@ export class WebWorkersInterop {
         }
 
         return pool;
-    }
+    },
 
     createJsWorkerSlot(pool, index) {
         const worker = new Worker(resolveBrowserUrl(pool.scriptPath), {
@@ -536,7 +534,7 @@ export class WebWorkersInterop {
         };
 
         return slot;
-    }
+    },
 
     handleJsWorkerMessage(pool, slot, message) {
         if (!message?.type) {
@@ -593,7 +591,7 @@ export class WebWorkersInterop {
                 });
                 break;
         }
-    }
+    },
 
     handleJsWorkerError(pool, slot, error) {
         const activeJobId = slot.activeJobId;
@@ -606,7 +604,7 @@ export class WebWorkersInterop {
                 errorMessage: error?.message ?? "Worker crashed unexpectedly."
             });
         }
-    }
+    },
 
     completeRunningJsJob(pool, slot, running, completion) {
         pool.runningJobs.delete(running.job.jobId);
@@ -651,7 +649,7 @@ export class WebWorkersInterop {
         }
 
         this.drainJsPool(pool);
-    }
+    },
 
     drainJsPool(pool) {
         for (const slot of pool.workers) {
@@ -690,7 +688,7 @@ export class WebWorkersInterop {
                 payload: job.payload
             });
         }
-    }
+    },
 
     buildJsPoolSnapshot(pool) {
         return {
@@ -719,7 +717,7 @@ export class WebWorkersInterop {
                 lastDurationMs: worker.lastDurationMs
             }))
         };
-    }
+    },
 
     createDotNetWorkerSlot(pool, index) {
         const worker = new Worker(pool.workerUrl, {
@@ -766,7 +764,7 @@ export class WebWorkersInterop {
         });
 
         return slot;
-    }
+    },
 
     handleDotNetWorkerMessage(pool, slot, message) {
         if (!message?.type) {
@@ -807,7 +805,7 @@ export class WebWorkersInterop {
                 });
                 break;
         }
-    }
+    },
 
     handleDotNetWorkerError(pool, slot, error) {
         if (!slot.isReady) {
@@ -825,7 +823,7 @@ export class WebWorkersInterop {
                 errorMessage: error?.message ?? "Worker crashed unexpectedly."
             });
         }
-    }
+    },
 
     completeRunningDotNetInvocation(pool, slot, running, completion) {
         pool.runningInvocations.delete(running.invocation.invocationId);
@@ -865,7 +863,7 @@ export class WebWorkersInterop {
         }
 
         this.drainDotNetPool(pool);
-    }
+    },
 
     replaceDotNetWorkerSlot(pool, slot, cancelled) {
         const slotIndex = pool.workers.indexOf(slot);
@@ -882,7 +880,7 @@ export class WebWorkersInterop {
             replacement.readyPromise.then(() => this.drainDotNetPool(pool)).catch(() => {
             });
         }
-    }
+    },
 
     drainDotNetPool(pool) {
         for (const slot of pool.workers) {
@@ -921,7 +919,7 @@ export class WebWorkersInterop {
                 arguments: invocation.arguments
             });
         }
-    }
+    },
 
     buildDotNetPoolSnapshot(pool) {
         return {
@@ -952,7 +950,7 @@ export class WebWorkersInterop {
                 lastDurationMs: worker.lastDurationMs
             }))
         };
-    }
+    },
 
     emitJsEvent(event) {
         if (!this.dotNetReference) {
@@ -961,7 +959,7 @@ export class WebWorkersInterop {
 
         event.backend = "JavaScript";
         this.dotNetReference.invokeMethodAsync("HandleCoordinatorEvent", JSON.stringify(event));
-    }
+    },
 
     emitDotNetEvent(event) {
         if (!this.dotNetReference) {
@@ -971,6 +969,45 @@ export class WebWorkersInterop {
         event.backend = "DotNet";
         this.dotNetReference.invokeMethodAsync("HandleDotNetCoordinatorEvent", JSON.stringify(event));
     }
+};
+
+export function initialize(dotNetReference) {
+    webWorkersInterop.initialize(dotNetReference);
 }
 
-window.WebWorkersInterop = new WebWorkersInterop();
+export function createPool(optionsJson) {
+    return webWorkersInterop.createPool(optionsJson);
+}
+
+export function poolExists(poolName, backend) {
+    return webWorkersInterop.poolExists(poolName, backend);
+}
+
+export function runRequest(requestJson) {
+    return webWorkersInterop.runRequest(requestJson);
+}
+
+export function cancelRequest(poolName, requestId, backend) {
+    return webWorkersInterop.cancelRequest(poolName, requestId, backend);
+}
+
+export function destroyPool(poolName, backend) {
+    return webWorkersInterop.destroyPool(poolName, backend);
+}
+
+export function getPoolSnapshot(poolName, backend) {
+    return webWorkersInterop.getPoolSnapshot(poolName, backend);
+}
+
+export function getPoolSnapshots(backend) {
+    return webWorkersInterop.getPoolSnapshots(backend);
+}
+
+export function getCoordinatorSnapshot(backend) {
+    return webWorkersInterop.getCoordinatorSnapshot(backend);
+}
+
+export function dispose() {
+    webWorkersInterop.dispose();
+}
+

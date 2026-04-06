@@ -9,19 +9,14 @@ namespace Soenneker.Blazor.WebWorkers.Constants;
 public static class WebWorkerAssetPaths
 {
     /// <summary>
-    /// Library-relative module root used with <c>IResourceLoader.ImportModule()</c>.
-    /// </summary>
-    public const string PackageModuleRoot = "Soenneker.Blazor.WebWorkers";
-
-    /// <summary>
-    /// Root static web asset path for this package.
+    /// Root static web asset path for this package (no leading slash; for conventional worker URL helpers).
     /// </summary>
     public const string PackageRoot = "_content/Soenneker.Blazor.WebWorkers";
 
     /// <summary>
-    /// Library-relative path to the package JavaScript interop module.
+    /// Absolute static web asset path to the package JavaScript interop module for <c>IModuleImportUtil.GetContentModuleReference()</c>.
     /// </summary>
-    public const string InteropScript = $"{PackageModuleRoot}/js/webworkersinterop.js";
+    public const string InteropScript = "/_content/Soenneker.Blazor.WebWorkers/js/webworkersinterop.js";
 
     /// <summary>
     /// Path to the package-owned generic .NET worker bootstrap script.
