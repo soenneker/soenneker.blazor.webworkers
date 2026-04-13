@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
+using Soenneker.Blazor.Utils.Ids;
 using Soenneker.Blazor.Utils.ModuleImport.Abstract;
 using Soenneker.Blazor.WebWorkers.Abstract;
 using Soenneker.Blazor.WebWorkers.Constants;
@@ -139,8 +140,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
 
             bool useDefaultPool = string.IsNullOrWhiteSpace(request.PoolName);
             request.PoolName = NormalizeDotNetPoolName(request.PoolName);
-            request.RequestId ??= Guid.NewGuid()
-                                      .ToString("N");
+            request.RequestId ??= BlazorIdGenerator.New("ww-req");
             request.Arguments ??= [];
 
             if (useDefaultPool)
@@ -183,8 +183,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
 
         bool useDefaultJsPool = string.IsNullOrWhiteSpace(request.PoolName);
         request.PoolName = NormalizePoolName(request.PoolName);
-        request.RequestId ??= Guid.NewGuid()
-                                  .ToString("N");
+        request.RequestId ??= BlazorIdGenerator.New("ww-req");
 
         if (useDefaultJsPool)
             await EnsurePoolExistsForRun(request.PoolName, cancellationToken);

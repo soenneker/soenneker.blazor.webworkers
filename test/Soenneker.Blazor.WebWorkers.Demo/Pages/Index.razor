@@ -11,6 +11,7 @@
 @using Soenneker.Blazor.WebWorkers.Enums
 @using Soenneker.Blazor.WebWorkers.Options
 @using Soenneker.Utils.Json
+@using Soenneker.Blazor.Utils.Ids
 @inject IWebWorkersUtil WebWorkers
 
 <PageTitle>Soenneker.Blazor.WebWorkers Demo</PageTitle>
@@ -669,8 +670,7 @@ await WebWorkers.CreatePool(new WebWorkerPoolOptions
 
     private DemoJobRecord CreateRecord()
     {
-        var jobId = Guid.NewGuid()
-                        .ToString("N");
+        var jobId = BlazorIdGenerator.New("ww-demo-job");
 
         return new DemoJobRecord
         {
@@ -687,8 +687,7 @@ await WebWorkers.CreatePool(new WebWorkerPoolOptions
     {
         return new DemoDotNetInvocationRecord
         {
-            InvocationId = Guid.NewGuid()
-                               .ToString("N"),
+            InvocationId = BlazorIdGenerator.New("ww-demo-inv"),
             MethodName = _dotNetMethodName,
             State = WebWorkerJobState.Running,
             StatusMessage = "Waiting for an available .NET worker to invoke the exported method."
