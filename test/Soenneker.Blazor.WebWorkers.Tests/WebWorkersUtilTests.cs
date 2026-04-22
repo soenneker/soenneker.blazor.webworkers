@@ -1,20 +1,19 @@
 using Soenneker.Blazor.WebWorkers.Abstract;
-using Soenneker.Tests.FixturedUnit;
-using Xunit;
+using Soenneker.Tests.HostedUnit;
 
 namespace Soenneker.Blazor.WebWorkers.Tests;
 
-[Collection("Collection")]
-public sealed class WebWorkersUtilTests : FixturedUnitTest
+[ClassDataSource<Host>(Shared = SharedType.PerTestSession)]
+public sealed class WebWorkersUtilTests : HostedUnitTest
 {
     private readonly IWebWorkersUtil _blazorlibrary;
 
-    public WebWorkersUtilTests(Fixture fixture, ITestOutputHelper output) : base(fixture, output)
+    public WebWorkersUtilTests(Host host) : base(host)
     {
         _blazorlibrary = Resolve<IWebWorkersUtil>(true);
     }
 
-    [Fact]
+    [Test]
     public void Default()
     {
 
