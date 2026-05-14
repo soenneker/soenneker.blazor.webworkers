@@ -257,7 +257,7 @@
                                         <Span Class="@GetJobStateClasses(job.State)">@job.State</Span>
                                         @if (!job.IsTerminal)
                                         {
-                                            <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Sm" OnClick="@(_ => CancelJobAsync(job))">Cancel</Button>
+                                            <Button Variant="ButtonVariant.Destructive" ButtonSize="ButtonSize.Sm" OnClick="@(_ => CancelJobAsync(job))">Cancel</Button>
                                         }
                                     </Div>
                                 </Div>
@@ -318,7 +318,7 @@
                                         <Span Class="@GetJobStateClasses(invocation.State)">@invocation.State</Span>
                                         @if (!invocation.IsTerminal)
                                         {
-                                            <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Sm" OnClick="@(_ => CancelDotNetRequestAsync(invocation))">Cancel</Button>
+                                            <Button Variant="ButtonVariant.Destructive" ButtonSize="ButtonSize.Sm" OnClick="@(_ => CancelDotNetRequestAsync(invocation))">Cancel</Button>
                                         }
                                     </Div>
                                 </Div>
