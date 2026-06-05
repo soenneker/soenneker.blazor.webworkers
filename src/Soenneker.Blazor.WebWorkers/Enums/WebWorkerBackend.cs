@@ -5,6 +5,12 @@ namespace Soenneker.Blazor.WebWorkers.Enums;
 /// </summary>
 public enum WebWorkerBackend
 {
+    /// <summary>
+    /// Represents the java script value.
+    /// </summary>
     JavaScript,
+    /// <summary>
+    /// Represents the dot net value.
+    /// </summary>
     DotNet
 }

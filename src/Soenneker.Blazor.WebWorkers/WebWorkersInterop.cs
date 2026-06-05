@@ -304,6 +304,11 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         }
     }
 
+    /// <summary>
+    /// Executes the handle coordinator event operation.
+    /// </summary>
+    /// <param name="eventJson">The event json.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     [JSInvokable]
     public async Task HandleCoordinatorEvent(string eventJson)
     {
@@ -338,6 +343,11 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         }
     }
 
+    /// <summary>
+    /// Executes the handle dot net coordinator event operation.
+    /// </summary>
+    /// <param name="eventJson">The event json.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     [JSInvokable]
     public async Task HandleDotNetCoordinatorEvent(string eventJson)
     {
@@ -369,6 +379,10 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         }
     }
 
+    /// <summary>
+    /// Asynchronously releases resources used by the current instance.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
