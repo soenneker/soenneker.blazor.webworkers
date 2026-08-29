@@ -26,6 +26,9 @@ public static class WebWorkerAssetPaths
     /// <summary>
     /// Builds a static web asset path for another Razor class library package.
     /// </summary>
+    /// <param name="packageId">Identifier of the package to target.</param>
+    /// <param name="relativeAssetPath">Path of the relative asset to use.</param>
+    /// <returns>The text produced by from Package.</returns>
     public static string FromPackage(string packageId, string relativeAssetPath)
     {
         if (packageId.IsNullOrWhiteSpace())
@@ -42,6 +45,9 @@ public static class WebWorkerAssetPaths
     /// <summary>
     /// Builds a conventional worker asset path under <c>js/workers</c> for another package.
     /// </summary>
+    /// <param name="packageId">Identifier of the package to target.</param>
+    /// <param name="workerFileName">Name of the worker file to target.</param>
+    /// <returns>The text produced by worker From Package.</returns>
     public static string WorkerFromPackage(string packageId, string workerFileName)
     {
         if (workerFileName.IsNullOrWhiteSpace())

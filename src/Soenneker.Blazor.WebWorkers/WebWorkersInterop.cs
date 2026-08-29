@@ -305,10 +305,10 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
     }
 
     /// <summary>
-    /// Executes the handle coordinator event operation.
+    /// Handles the coordinator event callback.
     /// </summary>
-    /// <param name="eventJson">The event json.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <param name="eventJson">Event JSON for the handle coordinator event operation.</param>
+    /// <returns>A task that completes when the handle coordinator event operation is complete.</returns>
     [JSInvokable]
     public async Task HandleCoordinatorEvent(string eventJson)
     {
@@ -344,10 +344,10 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
     }
 
     /// <summary>
-    /// Executes the handle dot net coordinator event operation.
+    /// Handles the dot net coordinator event callback.
     /// </summary>
-    /// <param name="eventJson">The event json.</param>
-    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <param name="eventJson">Event JSON for the handle dot net coordinator event operation.</param>
+    /// <returns>A task that completes when the handle dot net coordinator event operation is complete.</returns>
     [JSInvokable]
     public async Task HandleDotNetCoordinatorEvent(string eventJson)
     {
