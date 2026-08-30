@@ -256,7 +256,7 @@ const webWorkersInterop = {
             faultedCount: pools.reduce((total, pool) => total + pool.faultedCount, 0),
             pools
         });
-    }
+    },
 
     async createDotNetPool(optionsJson) {
         const options = parseJson(optionsJson);
@@ -389,7 +389,7 @@ const webWorkersInterop = {
             timestampUtc: slot.lastCompletedAtUtc
         });
 
-        this.replaceDotNetWorkerSlot(pool, slot, true);
+        this.replaceDotNetWorkerSlot(pool, slot);
         this.drainDotNetPool(pool);
     },
 
@@ -603,7 +603,11 @@ const webWorkersInterop = {
                 result: null,
                 errorMessage: error?.message ?? "Worker crashed unexpectedly."
             });
+            return;
         }
+
+        this.retireJsWorkerSlot(pool, slot, error?.message ?? "Worker crashed unexpectedly.");
+        this.drainJsPool(pool);
     },
 
     completeRunningJsJob(pool, slot, running, completion) {
@@ -641,14 +645,51 @@ const webWorkersInterop = {
             timestampUtc: slot.lastCompletedAtUtc
         });
 
-        if (completion.eventType === "faulted" && pool.restartFaultedWorkers) {
-            const slotIndex = pool.workers.indexOf(slot);
-            const replacement = this.createJsWorkerSlot(pool, slotIndex);
-            slot.worker.terminate();
-            pool.workers.splice(slotIndex, 1, replacement);
+        if (completion.eventType === "faulted") {
+            this.retireJsWorkerSlot(pool, slot, completion.errorMessage ?? "Worker execution failed.");
         }
 
         this.drainJsPool(pool);
+    },
+
+    retireJsWorkerSlot(pool, slot, errorMessage) {
+        const slotIndex = pool.workers.indexOf(slot);
+
+        if (slotIndex < 0) {
+            return;
+        }
+
+        try {
+            slot.worker.terminate();
+        } catch {
+        }
+
+        if (pool.restartFaultedWorkers) {
+            pool.workers.splice(slotIndex, 1, this.createJsWorkerSlot(pool, slotIndex));
+            return;
+        }
+
+        pool.workers.splice(slotIndex, 1);
+
+        if (pool.workers.length > 0) {
+            return;
+        }
+
+        for (const job of pool.queue) {
+            pool.stats.faultedJobs++;
+            this.emitJsEvent({
+                eventType: "faulted",
+                poolName: pool.name,
+                requestId: job.jobId,
+                jobId: job.jobId,
+                workloadName: job.workloadName,
+                durationMs: 0,
+                errorMessage: `No workers remain in pool '${pool.name}': ${errorMessage}`,
+                timestampUtc: nowIso()
+            });
+        }
+
+        pool.queue = [];
     },
 
     drainJsPool(pool) {
@@ -675,7 +716,17 @@ const webWorkersInterop = {
 
             if (job.timeoutMs && job.timeoutMs > 0) {
                 running.timeoutHandle = setTimeout(() => {
-                    this.cancelJob(pool.name, job.jobId);
+                    const active = pool.runningJobs.get(job.jobId);
+
+                    if (!active) {
+                        return;
+                    }
+
+                    this.completeRunningJsJob(pool, slot, active, {
+                        eventType: "faulted",
+                        result: null,
+                        errorMessage: `Timed out after ${job.timeoutMs} ms.`
+                    });
                 }, job.timeoutMs);
             }
 
@@ -859,13 +910,13 @@ const webWorkersInterop = {
         });
 
         if (completion.eventType === "faulted" && pool.restartFaultedWorkers) {
-            this.replaceDotNetWorkerSlot(pool, slot, false);
+            this.replaceDotNetWorkerSlot(pool, slot);
         }
 
         this.drainDotNetPool(pool);
     },
 
-    replaceDotNetWorkerSlot(pool, slot, cancelled) {
+    replaceDotNetWorkerSlot(pool, slot) {
         const slotIndex = pool.workers.indexOf(slot);
 
         try {
@@ -876,10 +927,47 @@ const webWorkersInterop = {
         const replacement = this.createDotNetWorkerSlot(pool, slotIndex);
         pool.workers.splice(slotIndex, 1, replacement);
 
-        if (!cancelled) {
-            replacement.readyPromise.then(() => this.drainDotNetPool(pool)).catch(() => {
+        replacement.readyPromise
+            .then(() => this.drainDotNetPool(pool))
+            .catch(error => this.removeFailedDotNetReplacement(pool, replacement, error));
+    },
+
+    removeFailedDotNetReplacement(pool, slot, error) {
+        const slotIndex = pool.workers.indexOf(slot);
+
+        if (slotIndex < 0) {
+            return;
+        }
+
+        try {
+            slot.worker.terminate();
+        } catch {
+        }
+
+        pool.workers.splice(slotIndex, 1);
+
+        if (pool.workers.some(worker => worker.isReady)) {
+            this.drainDotNetPool(pool);
+            return;
+        }
+
+        const errorMessage = error instanceof Error ? error.message : "Replacement .NET worker failed to initialize.";
+
+        for (const invocation of pool.queue) {
+            pool.stats.faultedInvocations++;
+            this.emitDotNetEvent({
+                eventType: "faulted",
+                poolName: pool.name,
+                requestId: invocation.invocationId,
+                invocationId: invocation.invocationId,
+                methodName: invocation.methodName,
+                durationMs: 0,
+                errorMessage,
+                timestampUtc: nowIso()
             });
         }
+
+        pool.queue = [];
     },
 
     drainDotNetPool(pool) {
@@ -958,7 +1046,7 @@ const webWorkersInterop = {
         }
 
         event.backend = "JavaScript";
-        this.dotNetReference.invokeMethodAsync("HandleCoordinatorEvent", JSON.stringify(event));
+        this.dotNetReference.invokeMethodAsync("HandleCoordinatorEvent", JSON.stringify(event)).catch(() => { });
     },
 
     emitDotNetEvent(event) {
@@ -967,7 +1055,7 @@ const webWorkersInterop = {
         }
 
         event.backend = "DotNet";
-        this.dotNetReference.invokeMethodAsync("HandleDotNetCoordinatorEvent", JSON.stringify(event));
+        this.dotNetReference.invokeMethodAsync("HandleDotNetCoordinatorEvent", JSON.stringify(event)).catch(() => { });
     }
 };
 
@@ -1010,4 +1098,3 @@ export function getCoordinatorSnapshot(backend) {
 export function dispose() {
     webWorkersInterop.dispose();
 }
-

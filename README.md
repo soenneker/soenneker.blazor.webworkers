@@ -4,18 +4,9 @@
 [![](https://img.shields.io/badge/Demo-Live-blueviolet?style=for-the-badge&logo=github)](https://soenneker.github.io/soenneker.blazor.webworkers)
 [![](https://img.shields.io/github/actions/workflow/status/soenneker/soenneker.blazor.webworkers/codeql.yml?style=for-the-badge)](https://github.com/soenneker/soenneker.blazor.webworkers/actions/workflows/codeql.yml)
 
-# ![](https://user-images.githubusercontent.com/4441470/224455560-91ed3ee7-f510-4041-a8d2-3fc093025112.png) Soenneker.Blazor.WebWorkers
-### Run background work in Blazor without freezing the UI.
+# Soenneker.Blazor.WebWorkers
 
-This package gives you one simple API for browser web workers in Blazor.
-
-Use it when you want to:
-
-- move CPU-heavy work off the UI thread
-- keep the app responsive while work is running
-- run custom JavaScript worker jobs
-- run exported C# methods in JS
-- monitor progress, cancel requests, and inspect worker pool state
+Runs CPU-heavy JavaScript workloads or exported C# methods in managed browser-worker pools without blocking Blazor's UI thread.
 
 ## Install
 
@@ -23,50 +14,28 @@ Use it when you want to:
 dotnet add package Soenneker.Blazor.WebWorkers
 ```
 
-## The Basic Idea
-
-`Soenneker.Blazor.WebWorkers` manages worker pools for you.
-
-In most apps, the flow is:
-
-1. Register `IWebWorkersUtil`
-2. Call `Initialize()`
-3. Create a worker pool
-4. Queue work
-5. Optionally monitor progress, cancel work, or inspect snapshots
-
-The same `IWebWorkersUtil` service works for both:
-
-- JavaScript workers
-- `.NET` workers
-
-## Quick Start
-
-Register the service in `Program.cs`:
+Register and inject the scoped utility:
 
 ```csharp
+using Soenneker.Blazor.WebWorkers.Registrars;
+
 builder.Services.AddWebWorkersUtilAsScoped();
 ```
 
-Inject it where you want to use it:
-
-```csharp
+```razor
+@using Soenneker.Blazor.WebWorkers.Abstract
 @inject IWebWorkersUtil WebWorkers
 ```
 
-Initialize it once before first use:
+Operations initialize the interop on demand. `Initialize()` is optional and only preloads it.
+
+## JavaScript workers
+
+Create a pool for a worker script served by your application:
 
 ```csharp
-await WebWorkers.Initialize();
-```
+using Soenneker.Blazor.WebWorkers.Options;
 
-## Common Workflow
-
-### 1. Create a JavaScript worker pool
-
-Point the pool at your worker script:
-
-```csharp
 await WebWorkers.CreatePool(new WebWorkerPoolOptions
 {
     WorkerCount = 4,
@@ -74,11 +43,7 @@ await WebWorkers.CreatePool(new WebWorkerPoolOptions
 });
 ```
 
-That creates the default JavaScript pool.
-
-### 2. Queue a JavaScript job
-
-Pass a workload name and payload:
+This creates the pool named `default`. Queue a workload and structured-clone-compatible payload:
 
 ```csharp
 using System.Text.Json;
@@ -86,91 +51,113 @@ using Soenneker.Blazor.WebWorkers.Dtos;
 
 WebWorkerResult<JsonElement> result = await WebWorkers.Run<JsonElement>(
     "prime-analysis",
-    new
-    {
-        upperBound = 180000
-    },
+    new { upperBound = 180_000 },
     progress =>
     {
-        Console.WriteLine($"{progress.Percent:0}% - {progress.Message}");
+        Console.WriteLine($"{progress.Percent:0}% — {progress.Message}");
         return ValueTask.CompletedTask;
-    });
+    },
+    cancellationToken);
 ```
 
-Your worker script is responsible for understanding the workload name and payload.
+Worker failures and cooperative cancellations are returned in `WebWorkerResult<T>`; inspect `State`, `Result`, and `ErrorMessage`. Cancelling the .NET caller can throw `OperationCanceledException` while it waits.
 
-### 3. Cancel or inspect work
+### Worker protocol
 
-```csharp
-await WebWorkers.CancelRequest("default", jobId);
+Your worker receives `run` and `cancel` messages. It must send a terminal `completed`, `cancelled`, or `faulted` message with the same `jobId`:
 
-WebWorkerCoordinatorSnapshot snapshot = await WebWorkers.GetCoordinatorSnapshot();
+```javascript
+let activeJobId = null;
+let cancellationRequested = false;
+const yieldToWorker = () => new Promise(resolve => setTimeout(resolve, 0));
+
+self.onmessage = async event => {
+    const message = event.data;
+
+    if (message?.type === "cancel" && message.jobId === activeJobId) {
+        cancellationRequested = true;
+        return;
+    }
+
+    if (message?.type !== "run") return;
+
+    activeJobId = message.jobId;
+    cancellationRequested = false;
+
+    try {
+        let total = 0;
+
+        for (let index = 0; index < message.payload.count; index++) {
+            if (cancellationRequested) throw new Error("cancelled");
+            total += index;
+
+            if (index % 1000 === 0) {
+                self.postMessage({
+                    type: "progress",
+                    jobId: message.jobId,
+                    percent: (index / message.payload.count) * 100,
+                    completedUnits: index,
+                    totalUnits: message.payload.count
+                });
+
+                await yieldToWorker();
+            }
+        }
+
+        self.postMessage({ type: "completed", jobId: message.jobId, result: total });
+    } catch (error) {
+        self.postMessage({
+            type: cancellationRequested ? "cancelled" : "faulted",
+            jobId: message.jobId,
+            errorMessage: error instanceof Error ? error.message : "Worker failed."
+        });
+    } finally {
+        activeJobId = null;
+        cancellationRequested = false;
+    }
+};
+
+self.postMessage({ type: "ready" });
 ```
 
-## JavaScript Worker Path
+A cancel message cannot be observed during one uninterrupted synchronous loop. Split CPU work into chunks and yield to the worker event loop. `TimeoutMs` is enforced by terminating the worker; a timed-out result has `Faulted` state.
 
-This is the best fit when your worker logic already lives in JavaScript, or when you want full control over the worker script.
-
-Important points:
-
-- JavaScript pools use `WebWorkerBackend.JavaScript`
-- the default pool name is `"default"`
-- you usually only need `WorkerCount` and `ScriptPath`
-- jobs are queued with a `workloadName` and optional `payload`
-- you can report progress back while work is running
-
-You can also target a specific named pool:
+Use `WorkerType = WebWorkerScriptType.Module` when the script imports ES modules. For a worker shipped by a Razor class library:
 
 ```csharp
-await WebWorkers.CreatePool(new WebWorkerPoolOptions
+string scriptPath = WebWorkerAssetPaths.WorkerFromPackage(
+    "My.Worker.Package",
+    "image.worker.js");
+```
+
+### Named pools and cancellation
+
+Set `WebWorkerPoolOptions.Name` to isolate scripts or concurrency limits. Assign a request ID when another handler needs to cancel the job:
+
+```csharp
+var request = new WebWorkerRequest
 {
-    Name = "images",
-    WorkerCount = 2,
-    ScriptPath = "js/workers/image.worker.js"
-});
+    PoolName = "images",
+    RequestId = $"thumbnail-{imageId}",
+    WorkloadName = "generate-thumbnail",
+    Payload = new { imageId },
+    TimeoutMs = 15_000
+};
 
-WebWorkerResult<JsonElement> result = await WebWorkers.Run<JsonElement>(
-    "images",
-    "generate-thumbnail",
-    new
-    {
-        width = 300,
-        height = 300
-    });
+Task<WebWorkerResult<JsonElement>> running =
+    WebWorkers.Run<JsonElement>(request).AsTask();
+
+await WebWorkers.CancelRequest("images", request.RequestId);
+WebWorkerResult<JsonElement> result = await running;
 ```
 
-### Worker scripts from a Razor class library
+JavaScript cancellation is cooperative unless a timeout terminates the worker. A running .NET request is cancelled by terminating and replacing its worker.
 
-If a worker file ships from an RCL, build the static asset path like this:
+## .NET workers
 
-```csharp
-string workerPath = WebWorkerAssetPaths.WorkerFromPackage(
-    "Soenneker.Blazor.Opfs",
-    "opfs.worker.js");
-```
+The .NET backend starts another WebAssembly runtime inside each browser worker and invokes `[JSExport]` methods from the main application assembly. It is for Blazor WebAssembly and costs more startup time and memory than a JavaScript worker.
 
-Then use that path as the pool's `ScriptPath`.
-
-## .NET Worker Path
-
-This package can also run exported C# methods inside a browser worker by booting a second .NET WebAssembly runtime in that worker.
-
-This path is useful when:
-
-- your work is already written in C#
-- you want to keep background logic in your Blazor app
-- you do not want to hand-write a JavaScript worker for that job
-
-### Requirements
-
-The `.NET` worker path requires:
-
-- Blazor WebAssembly
-- `AllowUnsafeBlocks=true` in the app `.csproj`
-- exported worker methods defined in the main app assembly
-- worker methods marked with `[JSExport]`
-
-Example `.csproj` setting:
+Enable unsafe blocks in the application project:
 
 ```xml
 <PropertyGroup>
@@ -178,147 +165,62 @@ Example `.csproj` setting:
 </PropertyGroup>
 ```
 
-### Define an exported worker method
+Define a static exported method with JavaScript-interoperable arguments and results:
 
 ```csharp
 using System.Runtime.InteropServices.JavaScript;
 using System.Runtime.Versioning;
-using Soenneker.Utils.Json;
+using System.Text.Json;
 
 [SupportedOSPlatform("browser")]
 public static partial class WorkerExports
 {
     [JSExport]
-    public static string? AnalyzePrimeRange(int upperBound)
+    public static async Task<string> AnalyzePrimeRange(int upperBound)
     {
-        return JsonUtil.Serialize(new
-        {
-            upperBound,
-            message = "Ran inside a .NET worker."
-        });
+        await Task.Yield();
+        return JsonSerializer.Serialize(new { upperBound });
     }
 }
 ```
 
-### Create a .NET worker pool
+The expression overload extracts the static method and argument values; it does not run the method on the UI thread:
 
 ```csharp
-using Soenneker.Blazor.WebWorkers.Enums;
-using Soenneker.Blazor.WebWorkers.Options;
+WebWorkerResult<string> result =
+    await WebWorkers.Run(() => WorkerExports.AnalyzePrimeRange(220_000));
+```
 
+With no .NET pool name, the default one-worker pool is created automatically. Create it explicitly to configure concurrency:
+
+```csharp
 await WebWorkers.CreatePool(new WebWorkerPoolOptions
 {
     Backend = WebWorkerBackend.DotNet,
-    WorkerCount = 1
+    WorkerCount = 2
 });
 ```
 
-### Invoke the exported method
+The expression must be a direct call to a static `Task`-returning method. A manual request must select the .NET backend, use the fully qualified exported `MethodName`, and provide `Arguments` in declaration order.
 
-You can call it with a request object:
+## Inspect and destroy pools
 
-```csharp
-using Soenneker.Blazor.WebWorkers.Dtos;
-using Soenneker.Blazor.WebWorkers.Enums;
-
-WebWorkerResult<string?> result = await WebWorkers.Run<string?>(new WebWorkerRequest
-{
-    Backend = WebWorkerBackend.DotNet,
-    MethodName = "MyApp.WorkerExports.AnalyzePrimeRange",
-    Arguments = [220000]
-});
-```
-
-Or use the expression-based overload:
+Snapshots are point-in-time diagnostics:
 
 ```csharp
-WebWorkerResult<MyResult> result =
-    await WebWorkers.Run(() => WorkerExports.RunAnalysisAsync(220000));
-```
-
-The expression-based overload is often the easiest option because it avoids building the request manually.
-
-## Important Types
-
-### `IWebWorkersUtil`
-
-The main service you work with. It handles:
-
-- initialization
-- pool creation and destruction
-- job execution
-- cancellation
-- pool and coordinator snapshots
-
-### `WebWorkerPoolOptions`
-
-Used when creating a pool.
-
-The most important properties are:
-
-- `Backend`
-- `Name`
-- `ScriptPath`
-- `WorkerCount`
-- `WorkerType`
-- `RuntimeScriptPath`
-- `BootConfigPath`
-- `RestartFaultedWorkers`
-
-### `WebWorkerRequest`
-
-Used when you need full control over a queued request.
-
-The most important properties are:
-
-- `PoolName`
-- `Backend`
-- `RequestId`
-- `WorkloadName`
-- `MethodName`
-- `Payload`
-- `Arguments`
-- `TimeoutMs`
-
-## Monitoring and Cancellation
-
-You can:
-
-- receive progress callbacks while a job is running
-- cancel a queued or running request
-- inspect one pool or all pools
-- inspect a full coordinator snapshot
-
-Examples:
-
-```csharp
-await WebWorkers.CancelRequest("default", requestId);
-
 WebWorkerPoolSnapshot? pool = await WebWorkers.GetPoolSnapshot("default");
 IReadOnlyList<WebWorkerPoolSnapshot> pools = await WebWorkers.GetPoolSnapshots();
 WebWorkerCoordinatorSnapshot snapshot = await WebWorkers.GetCoordinatorSnapshot();
+
+await WebWorkers.DestroyPool("default");
 ```
 
-## Things To Know
+Destroying or replacing a pool terminates its workers and returns `Cancelled` results for attached requests. Disposing the scoped utility cleans up every pool.
 
-- JavaScript and `.NET` workers share the same top-level service: `IWebWorkersUtil`
-- JavaScript jobs use `WorkloadName` plus `Payload`
-- `.NET` jobs use `MethodName` plus `Arguments`
-- the `.NET` worker path is for Blazor WebAssembly
-- `.NET` worker methods should usually return simple values or serialized JSON
-- if your worker code naturally returns `ValueTask`, expose a small `Task`-returning `[JSExport]` wrapper
-- cancellation of a running `.NET` worker request may require terminating and replacing the backing worker
+## Security and browser constraints
 
-## Which Path Should I Use?
-
-Use the JavaScript path when:
-
-- you already have worker logic in JavaScript
-- you need a custom browser worker script
-- your workload is naturally message-based
-
-Use the `.NET` path when:
-
-- your workload is already implemented in C#
-- you want to stay in C# as much as possible
-- you are building a Blazor WebAssembly app (Not available in Server)
+- Worker scripts execute with your application's origin privileges. Use trusted, application-controlled script paths; never accept one from user input.
+- Payloads use the structured-clone algorithm. Functions, DOM nodes, and many runtime-specific objects cannot be sent by this API.
+- Transfer lists, `SharedArrayBuffer`, and direct DOM access are not exposed.
+- Worker count multiplies memory use, especially for the .NET backend. Start small and measure on supported devices.
+- Browser workers are unavailable during server prerendering and in Blazor Server. Start pools only after WebAssembly is running.

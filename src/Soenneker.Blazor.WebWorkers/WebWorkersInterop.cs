@@ -167,9 +167,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
                     await EnsureInitialized(linkedDotNet);
                     IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linkedDotNet);
                     await module.InvokeVoidAsync("runRequest", linkedDotNet, JsonUtil.Serialize(request));
+                    return await pendingInvocation.Task.WaitAsync(linkedDotNet);
                 }
-
-                return await pendingInvocation.Task.WaitAsync(_cancellationScope.CancellationToken);
             }
             catch
             {
@@ -209,9 +208,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
                 await EnsureInitialized(linked);
                 IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
                 await module.InvokeVoidAsync("runRequest", linked, JsonUtil.Serialize(request));
+                return await pendingJob.Task.WaitAsync(linked);
             }
-
-            return await pendingJob.Task.WaitAsync(_cancellationScope.CancellationToken);
         }
         catch
         {
