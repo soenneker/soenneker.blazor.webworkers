@@ -7,6 +7,7 @@ using Soenneker.Utils.Json;
 
 namespace Soenneker.Blazor.WebWorkers.Dtos;
 
+/// <inheritdoc cref="IDotNetPendingInvocation" />
 internal sealed class DotNetPendingInvocation<TResult> : IDotNetPendingInvocation
 {
     private readonly TaskCompletionSource<WebWorkerResult<TResult>> _taskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);

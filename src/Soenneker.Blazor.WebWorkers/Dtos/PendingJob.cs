@@ -7,6 +7,7 @@ using Soenneker.Utils.Json;
 
 namespace Soenneker.Blazor.WebWorkers.Dtos;
 
+/// <inheritdoc cref="IPendingJob" />
 internal sealed class PendingJob<TResult> : IPendingJob
 {
     private readonly Func<WebWorkerJobProgress, ValueTask>? _progressCallback;
