@@ -234,7 +234,7 @@ const webWorkersInterop = {
             return this.getDotNetPoolSnapshots();
         }
 
-        return JSON.stringify(Array.from(this.pools.values()).map(pool => this.buildJsPoolSnapshot(pool)));
+        return JSON.stringify(Array.from(this.pools.values(), pool => this.buildJsPoolSnapshot(pool)));
     },
 
     getCoordinatorSnapshot(backend = "JavaScript") {
@@ -242,7 +242,7 @@ const webWorkersInterop = {
             return this.getDotNetCoordinatorSnapshot();
         }
 
-        const pools = Array.from(this.pools.values()).map(pool => this.buildJsPoolSnapshot(pool));
+        const pools = Array.from(this.pools.values(), pool => this.buildJsPoolSnapshot(pool));
 
         return JSON.stringify({
             backend: "JavaScript",
@@ -453,11 +453,11 @@ const webWorkersInterop = {
     },
 
     getDotNetPoolSnapshots() {
-        return JSON.stringify(Array.from(this.dotNetPools.values()).map(pool => this.buildDotNetPoolSnapshot(pool)));
+        return JSON.stringify(Array.from(this.dotNetPools.values(), pool => this.buildDotNetPoolSnapshot(pool)));
     },
 
     getDotNetCoordinatorSnapshot() {
-        const pools = Array.from(this.dotNetPools.values()).map(pool => this.buildDotNetPoolSnapshot(pool));
+        const pools = Array.from(this.dotNetPools.values(), pool => this.buildDotNetPoolSnapshot(pool));
 
         return JSON.stringify({
             backend: "DotNet",
@@ -748,7 +748,7 @@ const webWorkersInterop = {
             scriptPath: pool.scriptPath,
             workerType: pool.workerType === "module" ? "Module" : "Classic",
             workerCount: pool.workers.length,
-            busyWorkerCount: pool.workers.filter(worker => worker.isBusy).length,
+            busyWorkerCount: pool.workers.reduce((count, worker) => count + (worker.isBusy ? 1 : 0), 0),
             queuedCount: pool.queue.length,
             runningCount: pool.runningJobs.size,
             completedCount: pool.stats.completedJobs,
@@ -1018,7 +1018,7 @@ const webWorkersInterop = {
             runtimeScriptPath: pool.runtimeScriptUrl,
             bootConfigPath: pool.bootConfigUrl,
             workerCount: pool.workers.length,
-            busyWorkerCount: pool.workers.filter(worker => worker.isBusy).length,
+            busyWorkerCount: pool.workers.reduce((count, worker) => count + (worker.isBusy ? 1 : 0), 0),
             queuedCount: pool.queue.length,
             runningCount: pool.runningInvocations.size,
             completedCount: pool.stats.completedInvocations,

@@ -20,7 +20,7 @@ internal static class DotNetInvocationExpressionParser
         if (methodCall.Method.DeclaringType == null || methodCall.Method.DeclaringType.FullName.IsNullOrWhiteSpace())
             throw new ArgumentException("The target method must have a declaring type with a full name.", nameof(expression));
 
-        var arguments = new object[methodCall.Arguments.Count];
+        object[] arguments = methodCall.Arguments.Count == 0 ? [] : new object[methodCall.Arguments.Count];
 
         for (var index = 0; index < methodCall.Arguments.Count; index++)
         {
@@ -39,8 +39,11 @@ internal static class DotNetInvocationExpressionParser
 
     private static object? EvaluateArgument(Expression expression)
     {
+        if (expression is ConstantExpression constant)
+            return constant.Value;
+
         UnaryExpression converted = Expression.Convert(expression, typeof(object));
         Expression<Func<object?>> lambda = Expression.Lambda<Func<object?>>(converted);
-        return lambda.Compile().Invoke();
+        return lambda.Compile(preferInterpretation: true).Invoke();
     }
 }
