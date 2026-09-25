@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization.Metadata;
 using System;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -11,10 +12,12 @@ namespace Soenneker.Blazor.WebWorkers.Dtos;
 internal sealed class PendingJob<TResult> : IPendingJob
 {
     private readonly Func<WebWorkerJobProgress, ValueTask>? _progressCallback;
+    private readonly JsonTypeInfo<TResult> _typeInfo;
     private readonly TaskCompletionSource<WebWorkerResult<TResult>> _taskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    internal PendingJob(string jobId, Func<WebWorkerJobProgress, ValueTask>? progressCallback)
+    internal PendingJob(string jobId, Func<WebWorkerJobProgress, ValueTask>? progressCallback, JsonTypeInfo<TResult> typeInfo)
     {
+        _typeInfo = typeInfo ?? throw new ArgumentNullException(nameof(typeInfo));
         JobId = jobId;
         _progressCallback = progressCallback;
     }
@@ -89,7 +92,7 @@ internal sealed class PendingJob<TResult> : IPendingJob
         _taskCompletionSource.TrySetException(new ObjectDisposedException("WebWorkersInterop"));
     }
 
-    private static TResult? DeserializeResult(JsonElement result)
+    private TResult? DeserializeResult(JsonElement result)
     {
         if (result.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
             return default;
@@ -97,6 +100,6 @@ internal sealed class PendingJob<TResult> : IPendingJob
         if (typeof(TResult) == typeof(JsonElement))
             return (TResult) (object) result;
 
-        return JsonUtil.Deserialize<TResult>(result.GetRawText());
+        return JsonUtil.Deserialize<TResult>(result.GetRawText(), _typeInfo);
     }
 }

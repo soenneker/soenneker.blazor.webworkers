@@ -5,7 +5,7 @@ namespace Soenneker.Blazor.WebWorkers.Enums;
 /// <summary>
 /// Represents the terminal state of a web worker job.
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<WebWorkerJobState>))]
 public enum WebWorkerJobState
 {
     /// <summary>

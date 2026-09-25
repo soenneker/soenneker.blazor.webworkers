@@ -5,7 +5,7 @@ namespace Soenneker.Blazor.WebWorkers.Enums;
 /// <summary>
 /// Identifies how the browser should load a worker script.
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<WebWorkerScriptType>))]
 public enum WebWorkerScriptType
 {
     /// <summary>

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -18,9 +20,13 @@ using Soenneker.Utils.Json;
 
 namespace Soenneker.Blazor.WebWorkers;
 
-/// <inheritdoc cref="IWebWorkersInterop"/>
 public sealed class WebWorkersInterop : IWebWorkersInterop
 {
+    private readonly JsonSerializerContext _jsonContext;
+
+    private JsonTypeInfo<TJson> GetJsonTypeInfo<TJson>() =>
+        (JsonTypeInfo<TJson>)(_jsonContext.GetTypeInfo(typeof(TJson)) ?? throw new System.NotSupportedException($"No generated JSON metadata for {typeof(TJson)}."));
+
     private const string _modulePath = WebWorkerAssetPaths.InteropScript;
 
     private readonly IModuleImportUtil _moduleImportUtil;
@@ -32,8 +38,9 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
     private bool _disposed;
     private bool _initialized;
 
-    public WebWorkersInterop(IModuleImportUtil moduleImportUtil)
+    public WebWorkersInterop(JsonSerializerContext jsonContext, IModuleImportUtil moduleImportUtil)
     {
+        _jsonContext = jsonContext ?? throw new System.ArgumentNullException(nameof(jsonContext));
         _moduleImportUtil = moduleImportUtil;
     }
 
@@ -84,7 +91,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         {
             await EnsureInitialized(linked);
             IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
-            await module.InvokeVoidAsync("createPool", linked, JsonUtil.Serialize(options));
+            await module.InvokeVoidAsync("createPool", linked, JsonUtil.Serialize(options, LibraryJsonContext.Get<WebWorkerPoolOptions>()));
         }
     }
 
@@ -147,7 +154,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
                 await EnsureDotNetPoolExistsForRun(request.PoolName, cancellationToken);
 
             CancellationToken linkedDotNet = _cancellationScope.CancellationToken.Link(cancellationToken, out CancellationTokenSource? dotNetSource);
-            var pendingInvocation = new DotNetPendingInvocation<TResult>(request.RequestId);
+            var pendingInvocation = new DotNetPendingInvocation<TResult>(request.RequestId, GetJsonTypeInfo<TResult>());
 
             if (!_pendingInvocations.TryAdd(request.RequestId, pendingInvocation))
                 throw new InvalidOperationException($"A request with id '{request.RequestId}' is already pending.");
@@ -166,7 +173,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
                 {
                     await EnsureInitialized(linkedDotNet);
                     IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linkedDotNet);
-                    await module.InvokeVoidAsync("runRequest", linkedDotNet, JsonUtil.Serialize(request));
+                    await module.InvokeVoidAsync("runRequest", linkedDotNet, JsonUtil.Serialize(request, GetJsonTypeInfo<WebWorkerRequest>()));
                     return await pendingInvocation.Task.WaitAsync(linkedDotNet);
                 }
             }
@@ -188,7 +195,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
             await EnsurePoolExistsForRun(request.PoolName, cancellationToken);
 
         CancellationToken linked = _cancellationScope.CancellationToken.Link(cancellationToken, out CancellationTokenSource? source);
-        var pendingJob = new PendingJob<TResult>(request.RequestId, progressCallback);
+        var pendingJob = new PendingJob<TResult>(request.RequestId, progressCallback, GetJsonTypeInfo<TResult>());
 
         if (!_pendingJobs.TryAdd(request.RequestId, pendingJob))
             throw new InvalidOperationException($"A request with id '{request.RequestId}' is already pending.");
@@ -207,7 +214,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
             {
                 await EnsureInitialized(linked);
                 IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
-                await module.InvokeVoidAsync("runRequest", linked, JsonUtil.Serialize(request));
+                await module.InvokeVoidAsync("runRequest", linked, JsonUtil.Serialize(request, GetJsonTypeInfo<WebWorkerRequest>()));
                 return await pendingJob.Task.WaitAsync(linked);
             }
         }
@@ -268,7 +275,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
 
             return string.IsNullOrWhiteSpace(json) || string.Equals(json, "null", StringComparison.OrdinalIgnoreCase)
                 ? null
-                : JsonUtil.Deserialize<WebWorkerPoolSnapshot>(json);
+                : JsonUtil.Deserialize<WebWorkerPoolSnapshot>(json, LibraryJsonContext.Get<WebWorkerPoolSnapshot>());
         }
     }
 
@@ -283,7 +290,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
             IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
             string json = await module.InvokeAsync<string>("getPoolSnapshots", linked, backend.ToString());
 
-            return JsonUtil.Deserialize<List<WebWorkerPoolSnapshot>>(json) ?? [];
+            return JsonUtil.Deserialize<List<WebWorkerPoolSnapshot>>(json, LibraryJsonContext.Get<List<WebWorkerPoolSnapshot>>()) ?? [];
         }
     }
 
@@ -298,7 +305,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
             IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
             string json = await module.InvokeAsync<string>("getCoordinatorSnapshot", linked, backend.ToString());
 
-            return JsonUtil.Deserialize<WebWorkerCoordinatorSnapshot>(json) ?? new WebWorkerCoordinatorSnapshot();
+            return JsonUtil.Deserialize<WebWorkerCoordinatorSnapshot>(json, LibraryJsonContext.Get<WebWorkerCoordinatorSnapshot>()) ?? new WebWorkerCoordinatorSnapshot();
         }
     }
 
@@ -313,7 +320,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         if (string.IsNullOrWhiteSpace(eventJson))
             return;
 
-        var coordinatorEvent = JsonUtil.Deserialize<CoordinatorEvent>(eventJson);
+        var coordinatorEvent = JsonUtil.Deserialize<CoordinatorEvent>(eventJson, LibraryJsonContext.Get<CoordinatorEvent>());
 
         if (coordinatorEvent == null || string.IsNullOrWhiteSpace(coordinatorEvent.RequestId))
             return;
@@ -352,7 +359,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
         if (string.IsNullOrWhiteSpace(eventJson))
             return;
 
-        var coordinatorEvent = JsonUtil.Deserialize<CoordinatorEvent>(eventJson);
+        var coordinatorEvent = JsonUtil.Deserialize<CoordinatorEvent>(eventJson, LibraryJsonContext.Get<CoordinatorEvent>());
 
         if (coordinatorEvent == null || string.IsNullOrWhiteSpace(coordinatorEvent.RequestId))
             return;

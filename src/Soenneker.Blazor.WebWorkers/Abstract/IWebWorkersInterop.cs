@@ -11,6 +11,7 @@ namespace Soenneker.Blazor.WebWorkers.Abstract;
 /// <summary>
 /// Blazor interop for browser-facing worker orchestration functionality.
 /// </summary>
+/// <remarks>Register a source-generated JsonSerializerContext covering application payloads. JSON contracts are never discovered through reflection.</remarks>
 public interface IWebWorkersInterop : IAsyncDisposable
 {
     /// <summary>
