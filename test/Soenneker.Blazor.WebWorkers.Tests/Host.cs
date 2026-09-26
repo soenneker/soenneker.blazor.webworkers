@@ -29,6 +29,7 @@ public sealed class Host : UnitTestHost
 
         IConfiguration config = TestUtil.BuildConfig();
         services.AddSingleton(config);
+        services.AddSingleton<System.Text.Json.Serialization.JsonSerializerContext>(TestJsonContext.Default);
 
         services.AddWebWorkersUtilAsScoped();
     }
