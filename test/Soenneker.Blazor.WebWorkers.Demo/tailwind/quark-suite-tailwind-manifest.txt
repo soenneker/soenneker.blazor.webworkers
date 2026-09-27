@@ -138,6 +138,7 @@
 -80px
 -bottom-1
 -bottom-12
+-dark
 -left-1
 -left-12
 -mb-4
@@ -168,6 +169,7 @@ AM
 Accept
 AcceptAll
 Add
+AddQuarkThemeAsScoped
 AdditionalAttributes
 All
 Allows
@@ -290,11 +292,15 @@ GetSortDirection:
 Go
 Google
 HEX
+HH:mm
+HH:mm:ss
 HSL
 HandleActionClick
 HandleActionsOpenChanged
 HandleActivate
 HandleAddonClick
+HandleAutoSaveBlur
+HandleAutoSaveKeyDown
 HandleBackdropPointerDownOutside
 HandleBradixCloseClick
 HandleBradixValueChanged
@@ -320,8 +326,6 @@ HandleElementReferenceCaptured
 HandleFilesDropped
 HandleFilesSelected
 HandleFocus
-HandleFocusIn
-HandleFocusOut
 HandleGroupedClick
 HandleGroupedFocus
 HandleGroupedKeyDown
@@ -335,7 +339,6 @@ HandleInvalidSubmit
 HandleItemClick
 HandleKeyDown
 HandleMouseEnter
-HandleMouseLeave
 HandleMouseMove
 HandleMultipleValuesChanged
 HandleNextClick
@@ -364,7 +367,6 @@ HandleTouchCancel
 HandleTouchEnd
 HandleTouchStart
 HandleTriggerClick
-HandleTriggerPointerDown
 HandleValidSubmit
 HandleValueChanged
 HandleWrapperClick
@@ -401,6 +403,8 @@ Jun
 Juni
 KB
 Keeping
+Key
+KeyDownCallback
 KeyT
 Labels
 Language
@@ -537,6 +541,7 @@ Preserve
 PrevMonth
 PreventDefault
 PreventLinkDefault
+PreventPanelAutoFocus
 PreventPointerDownDefault
 PreviewAttributes
 Previous
@@ -564,6 +569,7 @@ ResolveText
 ResolvedMaximumArcLength
 ResolvedMinimumArcLength
 Retry
+RowAttributes
 Rows
 Saturation
 Save
@@ -574,6 +580,7 @@ Search
 Select
 SelectedDate
 Selection
+SelectionHeader
 Send
 Sending
 Sep
@@ -593,6 +600,7 @@ Spacebar
 StopClickPropagation
 Strong
 Suggestions
+Switch
 TValue
 Task
 Text
@@ -601,6 +609,7 @@ TextareaAttributes
 That
 The
 Theme
+Theme:
 This
 Thought
 Timeline
@@ -612,6 +621,7 @@ TotalRecords
 Tree
 TriggerAttributes
 TriggerContext
+TriggerPointerDownCallback
 Unable
 Undo
 Up
@@ -830,7 +840,10 @@ already
 alt
 alt+T
 altKey
+alternate
 always
+amber-400
+amber-700
 an
 analysis
 analyze
@@ -851,6 +864,7 @@ answered
 août
 appearance-none
 application
+application/ld+json
 application/pdf
 apr
 aprile
@@ -918,6 +932,11 @@ aria-valuemin
 aria-valuenow
 aria-valuetext
 article
+article:author
+article:modified_time
+article:published_time
+article:section
+article:tag
 as
 asc
 ascending
@@ -927,6 +946,7 @@ aspect-ratio
 aspect-ratio:800/320
 aspect-square
 assistant
+async
 at
 attachment
 attachment-description
@@ -940,6 +960,7 @@ attachments
 attachments-empty
 attrs
 audio
+author
 auto
 auto-cols-max
 auto-rows-min
@@ -953,6 +974,7 @@ avatar-fallback
 avatar-group
 avatar-group-count
 avatar-image
+avif
 avril
 backdrop-blur
 backdrop-blur-[1px]
@@ -1119,6 +1141,7 @@ can
 canceled
 cancelled
 cannot
+canonical
 capitalize
 caption-bottom
 card
@@ -1647,31 +1670,31 @@ data-[variant=pasted]:shrink-0
 data-[variant=pasted]:w-[156px]
 data-[vaul-drawer-direction=bottom]:border-t
 data-[vaul-drawer-direction=bottom]:bottom-0
-data-[vaul-drawer-direction=bottom]:data-[state=closed]:slide-out-to-bottom-10
-data-[vaul-drawer-direction=bottom]:data-[state=open]:slide-in-from-bottom-10
+data-[vaul-drawer-direction=bottom]:data-[state=closed]:slide-out-to-bottom-full
+data-[vaul-drawer-direction=bottom]:data-[state=open]:slide-in-from-bottom-full
 data-[vaul-drawer-direction=bottom]:inset-x-0
 data-[vaul-drawer-direction=bottom]:max-h-[50vh]
 data-[vaul-drawer-direction=bottom]:mt-24
 data-[vaul-drawer-direction=bottom]:rounded-t-xl
 data-[vaul-drawer-direction=left]:border-r
-data-[vaul-drawer-direction=left]:data-[state=closed]:slide-out-to-left-10
-data-[vaul-drawer-direction=left]:data-[state=open]:slide-in-from-left-10
+data-[vaul-drawer-direction=left]:data-[state=closed]:slide-out-to-left-full
+data-[vaul-drawer-direction=left]:data-[state=open]:slide-in-from-left-full
 data-[vaul-drawer-direction=left]:inset-y-0
 data-[vaul-drawer-direction=left]:left-0
 data-[vaul-drawer-direction=left]:rounded-r-xl
 data-[vaul-drawer-direction=left]:sm:max-w-sm
 data-[vaul-drawer-direction=left]:w-3/4
 data-[vaul-drawer-direction=right]:border-l
-data-[vaul-drawer-direction=right]:data-[state=closed]:slide-out-to-right-10
-data-[vaul-drawer-direction=right]:data-[state=open]:slide-in-from-right-10
+data-[vaul-drawer-direction=right]:data-[state=closed]:slide-out-to-right-full
+data-[vaul-drawer-direction=right]:data-[state=open]:slide-in-from-right-full
 data-[vaul-drawer-direction=right]:inset-y-0
 data-[vaul-drawer-direction=right]:right-0
 data-[vaul-drawer-direction=right]:rounded-l-xl
 data-[vaul-drawer-direction=right]:sm:max-w-sm
 data-[vaul-drawer-direction=right]:w-3/4
 data-[vaul-drawer-direction=top]:border-b
-data-[vaul-drawer-direction=top]:data-[state=closed]:slide-out-to-top-10
-data-[vaul-drawer-direction=top]:data-[state=open]:slide-in-from-top-10
+data-[vaul-drawer-direction=top]:data-[state=closed]:slide-out-to-top-full
+data-[vaul-drawer-direction=top]:data-[state=open]:slide-in-from-top-full
 data-[vaul-drawer-direction=top]:inset-x-0
 data-[vaul-drawer-direction=top]:max-h-[50vh]
 data-[vaul-drawer-direction=top]:mb-24
@@ -1755,6 +1778,8 @@ data-port-id
 data-port-type
 data-position
 data-pressed:bg-transparent
+data-quark-media
+data-quark-theme
 data-readonly
 data-responsive
 data-reverse
@@ -1935,6 +1960,8 @@ editor
 effective
 email
 embedded
+emerald-400
+emerald-700
 empty
 empty-content
 empty-description
@@ -1956,6 +1983,8 @@ equal
 error
 error:
 es
+event-timeline-connector
+event-timeline-marker
 events
 every
 exceeds
@@ -2023,6 +2052,7 @@ file:text-sm
 files
 fill-background
 fill-foreground
+fill-mode-both
 fill-muted
 fill-muted-foreground
 fill-none
@@ -2462,6 +2492,7 @@ h3[id]
 h4
 h5
 h6
+h:mm
 handle
 handling
 has
@@ -2916,6 +2947,7 @@ md:w-(--radix-navigation-menu-viewport-width)
 md:w-auto
 me-auto
 measurement
+media
 meet
 menu
 menu-action
@@ -3002,6 +3034,7 @@ ml-2
 ml-4
 ml-6
 ml-auto
+mode
 model
 model-selector
 model-selector-group
@@ -3021,7 +3054,6 @@ models
 month
 more
 motion-reduce:animate-none
-motion-reduce:transition-none
 moved
 mr-2
 ms-4
@@ -3125,6 +3157,18 @@ octubre
 of
 off
 offcanvas
+og:description
+og:image
+og:image:alt
+og:image:height
+og:image:type
+og:image:width
+og:locale
+og:locale:alternate
+og:site_name
+og:title
+og:type
+og:url
 on
 onabort
 onblur
@@ -3268,6 +3312,8 @@ peer/menu-button
 per
 percentage
 personalized
+picture
+picture-source
 pill
 pill-close
 pill-delta
@@ -3593,9 +3639,11 @@ rgba
 right
 right-0
 right-1
+right-12
 right-2
 right-2.5
 right-3
+right-3.5
 right-6
 right-8
 right-[calc(-50%+18px)]
@@ -3612,6 +3660,7 @@ ring-primary/30
 ring-ring
 ring-ring/50
 ring-sidebar-ring
+robots
 role
 rotate-0
 rotate-180
@@ -3797,6 +3846,8 @@ sizes
 skeleton
 skipped
 skipping
+sky-400
+sky-700
 slice-gradient-{index}
 sliceIndex
 slide
@@ -4099,6 +4150,13 @@ trigger
 true
 truncate
 tt
+twitter:card
+twitter:creator
+twitter:description
+twitter:image
+twitter:image:alt
+twitter:site
+twitter:title
 type
 ui
 uint
@@ -4156,7 +4214,6 @@ w-(--sidebar-width)
 w-0.5
 w-1
 w-10
-w-14
 w-2
 w-32
 w-4
