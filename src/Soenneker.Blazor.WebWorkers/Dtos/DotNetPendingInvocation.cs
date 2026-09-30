@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization.Metadata;
 using System;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -11,12 +10,10 @@ namespace Soenneker.Blazor.WebWorkers.Dtos;
 /// <inheritdoc cref="IDotNetPendingInvocation" />
 internal sealed class DotNetPendingInvocation<TResult> : IDotNetPendingInvocation
 {
-    private readonly JsonTypeInfo<TResult> _typeInfo;
     private readonly TaskCompletionSource<WebWorkerResult<TResult>> _taskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    internal DotNetPendingInvocation(string invocationId, JsonTypeInfo<TResult> typeInfo)
+    internal DotNetPendingInvocation(string invocationId)
     {
-        _typeInfo = typeInfo ?? throw new ArgumentNullException(nameof(typeInfo));
         InvocationId = invocationId;
     }
 
@@ -94,16 +91,16 @@ internal sealed class DotNetPendingInvocation<TResult> : IDotNetPendingInvocatio
                 return (TResult)(object)rawString;
 
             if (typeof(TResult).IsPrimitive || typeof(TResult).IsEnum)
-                return JsonUtil.Deserialize<TResult>(result.GetRawText(), _typeInfo);
+                return JsonUtil.Deserialize<TResult>(result.GetRawText());
 
             if (LooksLikeJson(rawString))
-                return JsonUtil.Deserialize<TResult>(rawString, _typeInfo);
+                return JsonUtil.Deserialize<TResult>(rawString);
         }
 
         if (typeof(TResult) == typeof(JsonElement))
             return (TResult)(object)result;
 
-        return JsonUtil.Deserialize<TResult>(result.GetRawText(), _typeInfo);
+        return JsonUtil.Deserialize<TResult>(result.GetRawText());
     }
 
     private static JsonElement ParseElement(string json)

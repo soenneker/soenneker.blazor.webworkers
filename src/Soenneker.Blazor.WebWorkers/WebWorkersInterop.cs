@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -22,11 +20,6 @@ namespace Soenneker.Blazor.WebWorkers;
 
 public sealed class WebWorkersInterop : IWebWorkersInterop
 {
-    private readonly JsonSerializerContext _jsonContext;
-
-    private JsonTypeInfo<TJson> GetJsonTypeInfo<TJson>() =>
-        (JsonTypeInfo<TJson>)(_jsonContext.GetTypeInfo(typeof(TJson)) ?? throw new System.NotSupportedException($"No generated JSON metadata for {typeof(TJson)}."));
-
     private const string _modulePath = WebWorkerAssetPaths.InteropScript;
 
     private readonly IModuleImportUtil _moduleImportUtil;
@@ -38,9 +31,8 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
     private bool _disposed;
     private bool _initialized;
 
-    public WebWorkersInterop(JsonSerializerContext jsonContext, IModuleImportUtil moduleImportUtil)
+    public WebWorkersInterop(IModuleImportUtil moduleImportUtil)
     {
-        _jsonContext = jsonContext ?? throw new System.ArgumentNullException(nameof(jsonContext));
         _moduleImportUtil = moduleImportUtil;
     }
 
@@ -154,7 +146,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
                 await EnsureDotNetPoolExistsForRun(request.PoolName, cancellationToken);
 
             CancellationToken linkedDotNet = _cancellationScope.CancellationToken.Link(cancellationToken, out CancellationTokenSource? dotNetSource);
-            var pendingInvocation = new DotNetPendingInvocation<TResult>(request.RequestId, GetJsonTypeInfo<TResult>());
+            var pendingInvocation = new DotNetPendingInvocation<TResult>(request.RequestId);
 
             if (!_pendingInvocations.TryAdd(request.RequestId, pendingInvocation))
                 throw new InvalidOperationException($"A request with id '{request.RequestId}' is already pending.");
@@ -173,7 +165,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
                 {
                     await EnsureInitialized(linkedDotNet);
                     IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linkedDotNet);
-                    await module.InvokeVoidAsync("runRequest", linkedDotNet, JsonUtil.Serialize(request, GetJsonTypeInfo<WebWorkerRequest>()));
+                    await module.InvokeVoidAsync("runRequest", linkedDotNet, JsonUtil.Serialize(request));
                     return await pendingInvocation.Task.WaitAsync(linkedDotNet);
                 }
             }
@@ -195,7 +187,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
             await EnsurePoolExistsForRun(request.PoolName, cancellationToken);
 
         CancellationToken linked = _cancellationScope.CancellationToken.Link(cancellationToken, out CancellationTokenSource? source);
-        var pendingJob = new PendingJob<TResult>(request.RequestId, progressCallback, GetJsonTypeInfo<TResult>());
+        var pendingJob = new PendingJob<TResult>(request.RequestId, progressCallback);
 
         if (!_pendingJobs.TryAdd(request.RequestId, pendingJob))
             throw new InvalidOperationException($"A request with id '{request.RequestId}' is already pending.");
@@ -214,7 +206,7 @@ public sealed class WebWorkersInterop : IWebWorkersInterop
             {
                 await EnsureInitialized(linked);
                 IJSObjectReference module = await _moduleImportUtil.GetContentModuleReference(_modulePath, linked);
-                await module.InvokeVoidAsync("runRequest", linked, JsonUtil.Serialize(request, GetJsonTypeInfo<WebWorkerRequest>()));
+                await module.InvokeVoidAsync("runRequest", linked, JsonUtil.Serialize(request));
                 return await pendingJob.Task.WaitAsync(linked);
             }
         }
