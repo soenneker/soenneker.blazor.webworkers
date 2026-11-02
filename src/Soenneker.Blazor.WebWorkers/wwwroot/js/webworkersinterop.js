@@ -21,7 +21,7 @@ function normalizeWorkerType(workerType) {
 const DEFAULT_POOL_NAME = "default";
 const DEFAULT_RUNTIME_SCRIPT_PATH = "_framework/dotnet.js";
 const DEFAULT_BOOT_CONFIG_PATH = "_framework/blazor.boot.json";
-const DEFAULT_DOTNET_WORKER_SCRIPT_PATH = new URL("./workers/dotnetwebworker.js", import.meta.url).toString();
+const DEFAULT_DOTNET_WORKER_SCRIPT_PATH = new URL("./workers/dotnetwebworker.min.js", import.meta.url).toString();
 
 function normalizePoolName(poolName) {
     return typeof poolName === "string" && poolName.trim().length > 0 ? poolName : DEFAULT_POOL_NAME;

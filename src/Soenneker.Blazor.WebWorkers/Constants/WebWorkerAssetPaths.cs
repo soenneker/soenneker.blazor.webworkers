@@ -16,12 +16,12 @@ public static class WebWorkerAssetPaths
     /// <summary>
     /// Absolute static web asset path to the package JavaScript interop module for <c>IModuleImportUtil.GetContentModuleReference()</c>.
     /// </summary>
-    public const string InteropScript = "_content/Soenneker.Blazor.WebWorkers/js/webworkersinterop.js";
+    public const string InteropScript = "_content/Soenneker.Blazor.WebWorkers/js/webworkersinterop.min.js";
 
     /// <summary>
     /// Path to the package-owned generic .NET worker bootstrap script.
     /// </summary>
-    public const string DotNetWorkerScript = $"{PackageRoot}/js/workers/dotnetwebworker.js";
+    public const string DotNetWorkerScript = $"{PackageRoot}/js/workers/dotnetwebworker.min.js";
 
     /// <summary>
     /// Builds a static web asset path for another Razor class library package.
