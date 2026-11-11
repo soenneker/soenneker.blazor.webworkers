@@ -45,11 +45,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Soenneker.Blazor.Utils.Ids" Version="11.0.62" />
-        <PackageReference Include="Soenneker.Blazor.Utils.ModuleImport" Version="11.0.1943" />
-        <PackageReference Include="Soenneker.Utils.Json" Version="11.0.2784" />
+        <PackageReference Include="Soenneker.Blazor.Utils.Ids" Version="11.0.63" />
+        <PackageReference Include="Soenneker.Blazor.Utils.ModuleImport" Version="11.0.1944" />
+        <PackageReference Include="Soenneker.Utils.Json" Version="11.0.2785" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Soenneker.Gen.Web.Minifier" Version="11.0.57" PrivateAssets="all" />
+        <PackageReference Include="Soenneker.Gen.Web.Minifier" Version="11.0.59" PrivateAssets="all" />
     </ItemGroup>
 </Project>
