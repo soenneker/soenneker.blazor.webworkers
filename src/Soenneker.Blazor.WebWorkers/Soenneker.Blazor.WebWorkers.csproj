@@ -50,6 +50,6 @@
         <PackageReference Include="Soenneker.Utils.Json" Version="11.0.2789" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Soenneker.Gen.Web.Minifier" Version="11.0.68" PrivateAssets="all" />
+        <PackageReference Include="Soenneker.Gen.Web.Minifier" Version="11.0.69" PrivateAssets="all" />
     </ItemGroup>
 </Project>
