@@ -88,13 +88,13 @@ internal sealed class DotNetPendingInvocation<TResult> : IDotNetPendingInvocatio
             string rawString = result.GetString() ?? string.Empty;
 
             if (typeof(TResult) == typeof(JsonElement))
-                return (TResult)(object)(LooksLikeJson(rawString) ? ParseElement(rawString) : result);
+                return (TResult)(object)(LooksLikeJson(rawString) ? JsonElement.Parse(rawString) : result);
 
             if (typeof(TResult) == typeof(string))
                 return (TResult)(object)rawString;
 
             if (typeof(TResult).IsPrimitive || typeof(TResult).IsEnum)
-                return JsonUtil.Deserialize<TResult>(result.GetRawText(), _typeInfo);
+                return result.Deserialize(_typeInfo);
 
             if (LooksLikeJson(rawString))
                 return JsonUtil.Deserialize<TResult>(rawString, _typeInfo);
@@ -103,14 +103,9 @@ internal sealed class DotNetPendingInvocation<TResult> : IDotNetPendingInvocatio
         if (typeof(TResult) == typeof(JsonElement))
             return (TResult)(object)result;
 
-        return JsonUtil.Deserialize<TResult>(result.GetRawText(), _typeInfo);
+        return result.Deserialize(_typeInfo);
     }
 
-    private static JsonElement ParseElement(string json)
-    {
-        using JsonDocument document = JsonDocument.Parse(json);
-        return document.RootElement.Clone();
-    }
 
     private static bool LooksLikeJson(string value)
     {

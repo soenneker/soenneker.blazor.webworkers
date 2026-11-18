@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Soenneker.Blazor.WebWorkers.Dtos.Abstract;
 using Soenneker.Blazor.WebWorkers.Enums;
-using Soenneker.Utils.Json;
 
 namespace Soenneker.Blazor.WebWorkers.Dtos;
 
@@ -100,6 +99,6 @@ internal sealed class PendingJob<TResult> : IPendingJob
         if (typeof(TResult) == typeof(JsonElement))
             return (TResult) (object) result;
 
-        return JsonUtil.Deserialize<TResult>(result.GetRawText(), _typeInfo);
+        return result.Deserialize(_typeInfo);
     }
 }
